@@ -1836,11 +1836,11 @@ function menuSummary(k){ var m=menuStyleVars();
   return ''; }
 function weckerHTML(){ var act=activePeople(), A=S.alarms||{}, codes=[['F','Frühschicht'],['S','Spätschicht'],['N','Nachtschicht'],['TD','Tagdienst']];
   return '<p class="hint">Erinnerungen stellst du direkt am Eintrag ein: bei jedem Termin unter „Erinnerung“ (auch eigene Zeit und „Als Wecker klingeln“), bei Geburtstagen im Adressbuch und bei den Tonnen. Hier stellst du die Wecker für Schichten ein.</p>'
-   +'<div class="panel" style="margin:0"><b class="bpt">Wecker für Schichten</b><p class="hint">Klingelt nur auf dem Handy der jeweiligen Person (Menü → „Ich bin“) und nur, solange die App offen ist. Nach dem Umzug auch bei geschlossener App.</p>'
+   +'<div class="panel" style="margin:0"><b class="bpt">Wecker für Schichten</b><p class="hint">Klingelt in der App auf dem Handy der jeweiligen Person (Menü → „Ich bin“). Bei geschlossener App kommt eine Benachrichtigung (oben einschalten). Mit 📱 stellst du die Zeit zusätzlich einmal im Handy-Wecker.</p>'
    +act.map(function(k){ return '<div class="fld"><span class="lbl" style="color:var(--p-'+k+')">'+esc(pname(k))+'</span>'+codes.map(function(c){ var a=(A[k]||{})[c[0]]||{}, ed=S.alEdit===k+'|'+c[0];
       return '<div class="tabrow" style="gap:8px"><span style="min-width:0">'+c[1]+'</span>'+(ed?'<div class="btw">'+timeSelects('al:'+k+':'+c[0],a.t||'05:00',true)+'<span>Uhr</span></div><button type="button" class="btn sm pri" data-a="aledit" data-v="">Fertig</button>'
         :'<span style="flex:0 0 auto;color:var(--ink-2);font-size:14px">'+(a.on?'⏰ '+esc(a.t||'05:00'):'aus')+'</span><button type="button" class="btn sm" data-a="aledit" data-v="'+k+'|'+c[0]+'">Ändern</button>')
-        +'<input type="checkbox" data-alon="'+k+'|'+c[0]+'"'+(a.on?' checked':'')+' aria-label="Wecker an"></div>'; }).join('')+'</div>'; }).join('')+'</div>'
+        +'<input type="checkbox" data-alon="'+k+'|'+c[0]+'"'+(a.on?' checked':'')+' aria-label="Wecker an"></div>'; }).join('')+phoneAlarmHTML(k)+'</div>'; }).join('')+'</div>'
    +'<button type="button" class="btn sm" data-a="altest">🔔 Testklingeln</button>'; }
 function settingsSheetHTML(){
   var pg=S.menuPage||'';
@@ -1857,7 +1857,7 @@ function settingsSheetHTML(){
       +'<div class="chips"><button type="button" class="chip" data-a="bgnone" aria-pressed="'+(!lsGet('bgm'))+'">Standard</button><label class="chip filechip" aria-pressed="'+(lsGet('bgm')==='img')+'">Eigenes Bild<input type="file" id="bgfile" accept="image/*"></label></div><p class="hint">Nach dem Antippen einer Art geht es weiter zu den Farben. Gilt nur für dieses Gerät.</p></div>'; }
   else if(pg==='farben'){ var m2=menuStyleVars(), ui=m2.ui; body='<div class="fld"><span class="lbl">Farben für „'+esc(ui.l)+'“</span><div class="sws">'+ui.cols.map(function(c,i){ var tr=bgTriple(ui,i,m2.dk); return '<button type="button" class="sw" style="background:'+bgImage(ui,tr,i)+'" data-a="bgcol" data-s="'+ui.k+'" data-v="'+i+'" aria-pressed="'+(m2.on&&m2.v===String(i))+'" aria-label="'+esc(ui.l)+' '+(ui.names?ui.names[i]:'Farbe '+(i+1))+'"></button>'; }).join('')
       +(ui.season?'<button type="button" class="chip" data-a="bgcol" data-s="season" data-v="a" aria-pressed="'+(m2.on&&m2.v==='a')+'">Automatisch nach Jahreszeit</button>':'')+'</div><p class="hint">Andere Art? Zurück und unter „Hintergrund · Farbstil“ wählen.</p><button type="button" class="btn sm" data-a="mpage" data-v="stil">Art wechseln</button></div>'; }
-  else if(pg==='wecker') body=weckerHTML();
+  else if(pg==='wecker') body=pushHTML()+weckerHTML();
   else if(pg==='zeit') body='<div class="fld"><span class="lbl">Datum und Uhrzeit auswählen</span><div class="chips">'+[['rad','Rad (scrollen)'],['liste','Liste (Auswahlfenster)']].map(function(o){ return '<button type="button" class="chip" data-a="pickmode" data-v="'+o[0]+'" aria-pressed="'+(S.pick===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät.</p></div>'
     +'<div class="fld"><span class="lbl">Tempo der Räder</span><div class="chips">'+[[60,'Ruhig'],[50,'Normal'],[40,'Schnell']].map(function(o){ return '<button type="button" class="chip" data-a="wi" data-v="'+o[0]+'" aria-pressed="'+(WI()===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Bei „Ruhig“ läuft das Rad bei gleicher Wischbewegung weniger weit.</p></div>';
   else if(pg==='reiter') body=navSettingsHTML();
@@ -2016,6 +2016,13 @@ document.addEventListener('click',function(e){
     case 'fblogin': if(window.FP_signIn) window.FP_signIn(); break;
     case 'fblogout': if(window.FP_signOut) window.FP_signOut(); break;
     case 'fbimport': break;
+    case 'vapidsave': (function(){ var el=$('#vapidIn'), v=el?String(el.value||'').replace(/\s+/g,''):''; if(v.length<60){ toast('Das sieht nicht nach dem Schlüssel aus. Bitte den ganzen langen Schlüssel einfügen.'); return; } S.settingsRows=S.settingsRows||{}; S.settingsRows.pushcfg={id:'pushcfg',vapid:v}; saveSettings('pushcfg',{vapid:v}); pushEnable(true); })(); break;
+    case 'pushon': pushEnable(true); break;
+    case 'pushoff': (function(){ var id=lsGet('pushid'); if(window.FP_PUSH) window.FP_PUSH.off(); if(id) S.store.remove('push',id); lsSet('pushid',''); lsSet('pushtok',''); toast('Benachrichtigungen auf diesem Handy aus.'); renderSheet(); })(); break;
+    case 'pushtest': S.store.set('pushsrv','test',{at:Date.now(),dev:lsGet('pushid')||''}); toast('Test angefordert. Er kommt in den nächsten 5 bis 15 Minuten. Du kannst die App dafür schließen.'); break;
+    case 'sacopy': saCopy(); break;
+    case 'saclear': S.saText=''; renderSheet(); break;
+    case 'phonealarm': (function(){ var p=(t.dataset.v||'05:00|Wecker').split('|'), u='intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR='+(+p[0].slice(0,2))+';i.android.intent.extra.alarm.MINUTES='+(+p[0].slice(3,5))+';S.android.intent.extra.alarm.MESSAGE='+encodeURIComponent(p[1]||'Wecker')+';end', gone=false, vh=function(){ if(document.hidden) gone=true; }; document.addEventListener('visibilitychange',vh); try{ location.href=u; }catch(x){} setTimeout(function(){ document.removeEventListener('visibilitychange',vh); if(!gone) toast('Der Handy-Wecker ließ sich nicht direkt öffnen. Bitte im Handy selbst auf '+p[0]+' Uhr stellen.'); },2000); })(); break;
     case 'navtoggle': S.navOpen=!S.navOpen; applyNav(); break;
     case 'navpos': lsSet('navpos',t.dataset.v); applyNav(); renderSheet(); break;
     case 'navfold': lsSet('navfold',t.dataset.v); S.navOpen=false; applyNav(); renderSheet(); break;
@@ -2272,6 +2279,7 @@ document.addEventListener('drop',pasteImg);
 document.addEventListener('dragover',function(e){ if(e.target&&e.target.closest&&e.target.closest('#pastezone')) e.preventDefault(); });
 document.addEventListener('beforeinput',function(e){ if(e.target&&e.target.id==='pastezone'&&e.inputType&&e.inputType.indexOf('insertFromPaste')<0) e.preventDefault(); });
 document.addEventListener('change',function(e){
+  if(e.target&&e.target.classList&&e.target.classList.contains('safile')){ var sf=e.target.files&&e.target.files[0]; e.target.value=''; if(!sf) return; var sr=new FileReader(); sr.onload=function(){ var o=null; try{ o=JSON.parse(sr.result); }catch(x){} if(!o||!o.private_key||!o.client_email){ toast('Das ist nicht die Schlüsseldatei. Sie heißt meist „familien-planner-firebase-adminsdk-….json“.'); return; } S.saText=JSON.stringify(o); renderSheet(); saCopy(); }; sr.readAsText(sf); return; }
   if(e.target&&e.target.classList&&e.target.classList.contains('impfile')){ var fi=e.target.files&&e.target.files[0]; e.target.value=''; if(!fi) return; var rd=new FileReader(); rd.onload=function(){ var dat; try{ dat=JSON.parse(rd.result); }catch(x){ toast('Das ist keine gültige Umzugs-Datei.'); return; } S.importing=true; var n=0; ['events','settings','shifts','notes','shop','contacts','chats','citems'].forEach(function(c){ if(dat[c]&&typeof dat[c]==='object') Object.keys(dat[c]).forEach(function(id){ n++; S.store.set(c,id,dat[c][id]); }); }); saveSettings('migrated',{ts:Date.now(),n:n}); lsSet('seen_all',String(Date.now())); setTimeout(function(){ S.importing=false; updChatBadge(); },2500); toast(n+' Einträge aus der Claude-Version übernommen.'); closeSheet(); }; rd.readAsText(fi); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.scal){ var m=JSON.parse(JSON.stringify(S.schoolCal||{})); m[e.target.dataset.scal]=!!e.target.checked; S.schoolCal=m; saveSettings('schoolcal',{m:m}); renderCal(); renderSchool(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.alon){ var aq=e.target.dataset.alon.split('|'), A2=JSON.parse(JSON.stringify(S.alarms||{})); A2[aq[0]]=A2[aq[0]]||{}; var cur=A2[aq[0]][aq[1]]||{t:'05:00'}; cur.on=!!e.target.checked; cur.t=cur.t||'05:00'; A2[aq[0]][aq[1]]=cur; S.alarms=A2; saveSettings('alarms',{p:A2}); renderSheet(); return; }
@@ -2487,7 +2495,7 @@ function boot(){
   if(window.FP_CONFIG){
     var lg=$('#login'), lm=$('#loginMsg'), lb=$('#loginBtn'), lo=$('#logoutBtn'); lg.hidden=false;
     var onAuth=function(d){ if(!d) return;
-      if(d.state==='in'){ S.fbUser=d.user; S.sample=d.sample; if(!S.store) connect(d.store); lg.hidden=true; renderAll(); }
+      if(d.state==='in'){ S.fbUser=d.user; S.sample=d.sample; if(!S.store) connect(wrapStore(d.store)); lg.hidden=true; renderAll(); }
       else if(d.state==='out'){ lg.hidden=false; lm.textContent='Melde dich mit deinem Google-Konto an. Nur eure Familie hat Zugang.'; lb.hidden=false; lo.hidden=true; }
       else if(d.state==='error'){ lg.hidden=false; lm.textContent=d.msg||'Fehler.'; lb.hidden=false; } };
     window.addEventListener('fp-auth',function(e){ onAuth(e.detail); }); onAuth(window.FP_LAST);
@@ -2507,6 +2515,56 @@ function boot(){
   });
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+
+/* ---------- Benachrichtigungen (GitHub-Version) ---------- */
+function pushPlan(){ var out=[], t0=ymd(new Date()), codes={F:'Frühschicht',S:'Spätschicht',N:'Nachtschicht',TD:'Tagdienst'};
+  var atMs=function(d,h){ h=/^\d{2}:\d{2}$/.test(h||'')?h:'00:00'; return new Date(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10),+h.slice(0,2),+h.slice(3,5)).getTime(); };
+  var add=function(k,d,h,title,body,to,al){ out.push({k:k,at:atMs(d,h),t:String(title||'').slice(0,80),b:String(body||'').slice(0,120),to:(to||[]).slice(),al:!!al}); };
+  for(var i=0;i<14;i++){ (function(t){ var tm=addDays(t,1);
+    (S.events||[]).forEach(function(ev){ if(!ev.remind) return; var nm=ev.title||(CAT[ev.cat]||CAT.sonst).l, to=ev.who||[], al=!!ev.alarm, st=ev.start?' um '+ev.start:'';
+      if(ev.remind==='eve'&&occursOn(ev,tm)) add('ev_'+ev.id+'_'+tm,t,'18:00',nm,'Morgen'+st,to,al);
+      if(ev.remind==='morning'&&occursOn(ev,t)) add('ev_'+ev.id+'_'+t,t,'07:00',nm,'Heute'+st,to,al);
+      if(ev.remind==='hour'&&ev.start&&occursOn(ev,t)){ var mm=(+ev.start.slice(0,2))*60+(+ev.start.slice(3))-60; if(mm>=0) add('ev_'+ev.id+'_'+t,t,pad(Math.floor(mm/60))+':'+pad(mm%60),nm,'In 1 Stunde, um '+ev.start,to,al); }
+      if(ev.remind==='custom'){ var od=addDays(t,+ev.remDays||0); if(occursOn(ev,od)) add('ev_'+ev.id+'_'+od,t,ev.remAt||'08:00',nm,(+ev.remDays?WD[weekday(od)]+', '+dmy(od):'Heute')+st,to,al); } });
+    BINS.forEach(function(b){ var c=S.muell&&S.muell[b.k]; if(c&&c.remind&&binDue(c,tm)) add('bin_'+b.k+'_'+tm,t,binTime(b.k),b.l+' rausstellen','Abholung morgen',[],!!c.alarm); });
+    (S.contacts||[]).forEach(function(c){ if(!c.bday||!c.remind||!c.name) return; var lim={day:0,d1:1,d3:3,d7:7}[c.remind]; if(lim===undefined) return; var nb=addDays(t,lim); if(bdayNext(c,t)!==nb) return; add('bd_'+c.id+'_'+nb,t,c.remAt||'09:00','🎂 '+c.name,lim?'Geburtstag am '+dmy(nb):'Hat heute Geburtstag',PEOPLE.indexOf(c.owner)>-1?[c.owner]:[],!!c.alarm); });
+    PEOPLE.forEach(function(k){ var A=(S.alarms||{})[k]; if(!A) return; var sc=shiftOn(k,t)[0], a=sc&&A[sc]; if(a&&a.on){ var ta=shiftTimes(k,t).a; add('sh_'+k+'_'+t+'_'+sc,t,a.t||'05:00','⏰ '+(codes[sc]||sc),'Heute'+(ta?' ab '+ta:''),[k],true); } });
+  })(addDays(t0,i)); }
+  out.sort(function(a,b){ return a.at-b.at; }); return out.slice(0,400); }
+var pushLast='', pushInit=false, pushT=null;
+function pushRows(){ return S.settingsRows||{}; }
+function pushSync(){ if(!S.store||!S.fbUser||!window.FP_PUSH) return;
+  try{ var t0=ymd(new Date()), it=pushPlan(), js=JSON.stringify(it), row=pushRows().pushplan, cur=row?JSON.stringify(row.items||[]):'';
+    if(js!==cur&&js!==pushLast&&(!row||row.day!==t0||(S.lastEdit||0)>(row.ts||0)||(row.ts||0)<Date.now()-6*3600000)){ pushLast=js; S.store.set('settings','pushplan',{items:it,day:t0,ts:Date.now(),by:S.me||''}); } }catch(e){}
+  var cfg=pushRows().pushcfg; if(lsGet('pushid')&&cfg&&cfg.vapid&&(!pushInit||lsGet('pushme')!==(S.me||''))){ pushInit=true; pushEnable(false); } }
+setInterval(pushSync,60000); setTimeout(pushSync,8000);
+function wrapStore(st){ var w={}; Object.keys(st).forEach(function(k){ w[k]=st[k]; });
+  ['set','update','remove'].forEach(function(m){ w[m]=function(c,id){ if(!(c==='settings'&&id==='pushplan')&&c!=='push'&&c!=='pushsrv'&&c!=='notes'&&c!=='shop'){ S.lastEdit=Date.now(); clearTimeout(pushT); pushT=setTimeout(pushSync,3000); } return st[m].apply(st,arguments); }; });
+  return w; }
+function pushOn(){ return !!lsGet('pushid')&&window.FP_PUSH&&window.FP_PUSH.ok()&&Notification.permission==='granted'; }
+function pushEnable(ask){ var cfg=pushRows().pushcfg||{}; if(!window.FP_PUSH||!S.store) return;
+  if(!S.me){ if(ask) toast('Bitte zuerst unter Menü → „Ich bin“ auswählen, wer dieses Handy benutzt.'); return; }
+  if(ask){ S.pushBusy=true; renderSheet(); }
+  window.FP_PUSH.token(cfg.vapid,ask).then(function(tk){ var id=lsGet('pushid')||S.store.newId();
+      if(!lsGet('pushid')||lsGet('pushtok')!==tk||lsGet('pushme')!==S.me){ S.store.set('push',id,{token:tk,me:S.me,ts:Date.now(),ua:navigator.userAgent.slice(0,120)}); lsSet('pushid',id); lsSet('pushtok',tk); lsSet('pushme',S.me); }
+      if(ask) toast('Benachrichtigungen sind auf diesem Handy an.'); })
+    .catch(function(e){ if(!ask) return; var c=e&&e.code; toast(c==='denied'?'Benachrichtigungen sind blockiert. Bitte in den Browser-Einstellungen für diese Seite erlauben.':c==='unsupported'?'Dieser Browser kann keine Benachrichtigungen empfangen.':c==='noperm'?'Ohne deine Erlaubnis geht es nicht.':c==='novapid'?'Der Schlüssel fehlt noch.':'Einschalten hat nicht geklappt ('+String((e&&e.message)||c||'Fehler').slice(0,140)+').'); })
+    .then(function(){ S.pushBusy=false; if(S.sheet==='settings'&&S.menuPage==='wecker') renderSheet(); }); }
+function pushHTML(){ if(!S.fbUser||!window.FP_PUSH) return ''; var cfg=pushRows().pushcfg||{}, ok=window.FP_PUSH.ok(), perm=ok?Notification.permission:'', on=pushOn();
+  var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">🔔 Benachrichtigungen bei geschlossener App</b>';
+  if(!ok) return h+'<p class="hint">Auf diesem Gerät oder in diesem Browser nicht möglich. Auf dem iPhone muss die App dafür zum Home-Bildschirm hinzugefügt sein.</p></div>';
+  if(!cfg.vapid) h+='<p class="hint">Einmalig einrichten: In Firebase unter Projekteinstellungen → Cloud Messaging → Web-Push-Zertifikate ein Schlüsselpaar erzeugen und den langen Schlüssel hier einfügen. Gilt dann für die ganze Familie.</p><input type="text" id="vapidIn" placeholder="Schlüssel hier einfügen" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="btns"><button type="button" class="btn sm pri" data-a="vapidsave">Speichern und einschalten</button></div>';
+  else h+='<p class="hint">'+(S.pushBusy?'Wird eingeschaltet …':on?'An auf diesem Handy für '+esc(S.me?pname(S.me):'?')+'. Es kommen Chat-Nachrichten, Erinnerungen, Geburtstage, Tonnen und Schicht-Wecker. Sie kommen auch bei geschlossener App, können aber ein paar Minuten früher oder später eintreffen.':perm==='denied'?'Blockiert. Bitte in den Browser-Einstellungen für diese Seite Benachrichtigungen erlauben.':'Auf diesem Handy aus. Jedes Familienmitglied schaltet sie auf seinem eigenen Handy ein.')+'</p>'
+    +'<div class="btns">'+(on?'<button type="button" class="btn sm" data-a="pushtest">Test schicken</button><button type="button" class="btn sm" data-a="pushoff">Ausschalten</button>':'<button type="button" class="btn sm pri" data-a="pushon"'+(S.pushBusy?' disabled':'')+'>Einschalten</button>')+'</div>';
+  h+='<details style="margin-top:10px"><summary>Einrichtung für GitHub (nur einmal, für John)</summary><div><p class="hint">Die Schlüsseldatei aus Firebase (Projekteinstellungen → Dienstkonten → Neuen privaten Schlüssel generieren) hier wählen. Der Inhalt wird nur kopiert, nicht gespeichert. Dann bei GitHub als Secret <b>FIREBASE_SA</b> einfügen.</p><label class="btn sm filebtn">Schlüsseldatei wählen<input type="file" class="safile" accept=".json,application/json"></label>'
+    +(S.saText?'<textarea readonly id="saOut" rows="3" style="width:100%;margin-top:8px;font:12px monospace">'+esc(S.saText)+'</textarea><div class="btns"><button type="button" class="btn sm pri" data-a="sacopy">Nochmal kopieren</button><button type="button" class="btn sm" data-a="saclear">Fertig, löschen</button></div>':'')+'</div></details>';
+  return h+'</div>'; }
+function phoneAlarmHTML(k){ if(!/Android/i.test(navigator.userAgent)) return ''; var A=(S.alarms||{})[k]||{}, t0=ymd(new Date()), nm={F:'Frühschicht',S:'Spätschicht',N:'Nachtschicht',TD:'Tagdienst'};
+  for(var i=0;i<8;i++){ var d=addDays(t0,i), sc=shiftOn(k,d)[0], a=sc&&A[sc]; if(!a||!a.on) continue; var tm=a.t||'05:00'; if(i===0&&nowHM()>=tm) continue;
+    return '<button type="button" class="btn sm" style="margin-top:6px" data-a="phonealarm" data-v="'+esc(tm)+'|'+esc(nm[sc]||sc)+'">📱 Handy-Wecker stellen: '+(i===0?'heute':i===1?'morgen':WD[weekday(d)])+' '+esc(tm)+' Uhr</button>'; }
+  return ''; }
+function saCopy(){ var tx=S.saText||''; var fb=function(){ var ta=$('#saOut'); if(ta){ ta.focus(); ta.select(); try{ document.execCommand('copy'); toast('Kopiert. Jetzt bei GitHub einfügen.'); }catch(e){ toast('Bitte den Text lange antippen und kopieren.'); } } };
+  try{ navigator.clipboard.writeText(tx).then(function(){ toast('Kopiert. Jetzt bei GitHub einfügen.'); },fb); }catch(e){ fb(); } }
 function alarmsDue(){ var t=ymd(new Date()), tm=addDays(t,1), out=[], hm=function(x){ return x||'00:00'; };
   S.events.forEach(function(ev){ if(!ev.alarm||!ev.remind) return; var nm=ev.title||(CAT[ev.cat]||CAT.sonst).l;
     if(ev.remind==='eve'&&occursOn(ev,tm)) out.push({key:'ev_'+ev.id+'_'+tm,at:'18:00',title:nm,sub:'Morgen'+(ev.start?' um '+ev.start:'')});

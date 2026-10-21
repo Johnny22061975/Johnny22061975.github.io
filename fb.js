@@ -59,6 +59,22 @@ try {
       try { return JSON.parse(t); } catch (e) { throw { code: 'invalid_json' }; }
     }
   };
+  // Benachrichtigungen: Gerät bei Firebase Cloud Messaging anmelden
+  window.FP_PUSH = {
+    ok: () => 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window,
+    async token(vapid, ask) {
+      if (!vapid) throw { code: 'novapid' };
+      if (!window.FP_PUSH.ok()) throw { code: 'unsupported' };
+      const perm = ask ? await Notification.requestPermission() : Notification.permission;
+      if (perm !== 'granted') throw { code: perm === 'denied' ? 'denied' : 'noperm' };
+      const M = await import(B + 'firebase-messaging.js');
+      if (!(await M.isSupported())) throw { code: 'unsupported' };
+      const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+      try { return await M.getToken(M.getMessaging(app), { vapidKey: vapid.trim(), serviceWorkerRegistration: reg }); }
+      catch (e) { throw { code: 'token', message: String((e && e.message) || e) }; }
+    },
+    async off() { try { const M = await import(B + 'firebase-messaging.js'); await M.deleteToken(M.getMessaging(app)); } catch (e) {} }
+  };
   window.FP_signIn = async () => {
     const p = new AU.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
     try { await AU.signInWithPopup(auth, p); }

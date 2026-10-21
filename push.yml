@@ -1,0 +1,29 @@
+name: Benachrichtigungen
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: push
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  senden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Benachrichtigungen schicken
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+        run: node push-sender.mjs
+      - name: Wach halten (GitHub pausiert Zeitpläne sonst nach 60 Tagen ohne Änderung)
+        run: |
+          last=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - last )) -gt 3888000 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Wach halten"
+            git push
+          fi
