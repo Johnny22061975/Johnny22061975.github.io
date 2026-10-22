@@ -69,7 +69,8 @@ try {
       if (perm !== 'granted') throw { code: perm === 'denied' ? 'denied' : 'noperm' };
       const M = await import(B + 'firebase-messaging.js');
       if (!(await M.isSupported())) throw { code: 'unsupported' };
-      const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+      const reg = await navigator.serviceWorker.register('sw.js');
+      await Promise.race([navigator.serviceWorker.ready, new Promise((_, rej) => setTimeout(() => rej({ code: 'swfail', message: 'Hintergrunddienst startet nicht (fehlt eine Datei auf GitHub?)' }), 15000))]);
       try { return await M.getToken(M.getMessaging(app), { vapidKey: vapid.trim(), serviceWorkerRegistration: reg }); }
       catch (e) { throw { code: 'token', message: String((e && e.message) || e) }; }
     },
