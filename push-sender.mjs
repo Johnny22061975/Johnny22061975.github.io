@@ -93,12 +93,16 @@ async function main() {
   // 2) Neue Chat-Nachrichten
   if (!st.lastChat) { st.lastChat = now; changed = true; }
   else {
+    const cs = (await get('pushsrv/chatseen')) || {}, wseen = cs.seen || {};
+    if (Object.keys(wseen).length > 500) { const keep = {}; for (const [k, v] of Object.entries(wseen)) if (v > now - 2 * 86400000) keep[k] = v; await put('pushsrv/chatseen', { seen: keep }); }
     const msgs = (await newer('notes', 'ts', st.lastChat - 2 * 3600000)).filter(m => !seen[m.id] && typeof m.ts === 'number').sort((a, b) => a.ts - b.ts);
     if (msgs.length) {
       const people = (await get('settings/people')) || {};
       const chats = {}; for (const c of await list('chats')) chats[c.id] = c;
       const nm = k => (people[k] && people[k].name) || 'Jemand';
       for (const m of msgs) {
+        if (wseen[m.id]) { seen[m.id] = m.ts; st.lastChat = Math.max(st.lastChat, m.ts); changed = true; continue; } // schon sofort per Cloudflare verschickt
+        if (now - m.ts < 3 * 60000) continue; // ganz neue Nachrichten erst Cloudflare überlassen
         seen[m.id] = m.ts; st.lastChat = Math.max(st.lastChat, m.ts); changed = true;
         if (m.ts < now - 6 * 3600000) continue;
         const cid = m.chat || 'all', c = chats[cid];
