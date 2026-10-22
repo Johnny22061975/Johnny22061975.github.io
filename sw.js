@@ -1,5 +1,5 @@
 // Familien-Planer Service Worker: App offline startbar machen
-const C = 'fp-v3';
+const C = 'fp-v4';
 const CORE = ['./', './index.html', './config.js', './fb.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => Promise.all(CORE.map(u => c.add(u).catch(() => null)))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -26,14 +26,15 @@ self.addEventListener('push', e => {
     if (d.kind === 'chat' && cs.some(c => c.visibilityState === 'visible')) return;
     return self.registration.showNotification(d.title || 'Familien-Planer', {
       body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag, icon: 'icon-192.png', badge: 'icon-192.png',
-      requireInteraction: al, vibrate: al ? [600, 200, 600, 200, 600, 200, 600, 200, 600] : [200, 100, 200], data: { url: './' }
+      requireInteraction: al, vibrate: al ? [600, 200, 600, 200, 600, 200, 600, 200, 600] : [200, 100, 200], data: { url: './', chat: (d.kind === 'chat' && /^chat_/.test(d.tag || '')) ? String(d.tag).slice(5) : '' }
     });
   }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const chat = (e.notification.data && e.notification.data.chat) || '';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
-    for (const c of cs) { if ('focus' in c) return c.focus(); }
-    return self.clients.openWindow('./');
+    for (const c of cs) { if ('focus' in c) { if (chat) c.postMessage({ openChat: chat }); return c.focus(); } }
+    return self.clients.openWindow(chat ? './#chat=' + encodeURIComponent(chat) : './');
   }));
 });
