@@ -3,7 +3,11 @@
 // Braucht keine Zusatzpakete. Der geheime Schlüssel steht nur im GitHub-Secret FIREBASE_SA.
 import crypto from 'node:crypto';
 
-const sa = JSON.parse(process.env.FIREBASE_SA || '{}');
+// Fehler als „Annotation“ ausgeben: die sieht man bei GitHub auch ohne Anmeldung
+const note = (lvl, msg) => console.log(`::${lvl} title=Familien-Planer::` + String(msg).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').slice(0, 900));
+let sa = {};
+try { sa = JSON.parse(process.env.FIREBASE_SA || '{}'); }
+catch (e) { note('error', 'Das Secret FIREBASE_SA ist kein gültiger Schlüssel-Text (beim Einfügen beschädigt?): ' + e.message); process.exit(1); }
 if (!sa.private_key || !sa.client_email || !sa.project_id) { console.log('Secret FIREBASE_SA fehlt oder ist unvollständig.'); process.exit(0); }
 const P = sa.project_id;
 const DB = `https://firestore.googleapis.com/v1/projects/${P}/databases/(default)/documents`;
@@ -135,4 +139,4 @@ async function main() {
     await put('pushsrv/state', { sent, seen, lastChat: st.lastChat, lastTest: st.lastTest || 0, ts: now });
   }
 }
-main().catch(e => { console.log(String(e && e.stack || e)); process.exit(1); });
+main().catch(e => { console.log(String(e && e.stack || e)); note('error', (e && e.message) || e); process.exit(1); });
