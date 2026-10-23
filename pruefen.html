@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Familien-Planer Diagnose</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+*{box-sizing:border-box}html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+
+/* Layout: eine Spalte, je Prüfung eine Karte mit Ampel links */
+:root{
+  --bg:#f3f4f2; --flaeche:#ffffff; --tx:#1c2228; --mu:#5d6771; --linie:#dfe2df;
+  --ok:#2e7d52; --warn:#b87514; --bad:#bf3b36; --akzent:#2b5f8a;
+  --display:'Archivo',system-ui,sans-serif; --body:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#13181c; --flaeche:#1b2227; --tx:#e7ecef; --mu:#95a1ab; --linie:#2b343b;
+  --ok:#5cc08b; --warn:#e0a33f; --bad:#f0736c; --akzent:#79b3e0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13181c; --flaeche:#1b2227; --tx:#e7ecef; --mu:#95a1ab; --linie:#2b343b;
+  --ok:#5cc08b; --warn:#e0a33f; --bad:#f0736c; --akzent:#79b3e0; color-scheme:dark}
+
+body{background:var(--bg);color:var(--tx);font-family:var(--body);line-height:1.5}
+.wrap{max-width:680px;margin:0 auto;padding-block:26px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-family:var(--display);font-size:1.6rem;font-weight:700;margin:0 0 4px;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--mu);font-size:.93rem;margin:0 0 18px}
+.adr{font-family:var(--mono);font-size:.85rem;color:var(--akzent);word-break:break-all}
+
+#fazit{border:1px solid var(--linie);border-left:5px solid var(--mu);background:var(--flaeche);
+  border-radius:10px;padding:14px 16px;margin-bottom:18px}
+#fazit h2{font-family:var(--display);font-size:1.05rem;margin:0 0 6px}
+#fazit p{margin:0;font-size:.95rem}
+#fazit.ok{border-left-color:var(--ok)} #fazit.warn{border-left-color:var(--warn)} #fazit.bad{border-left-color:var(--bad)}
+
+.liste{display:flex;flex-direction:column;gap:10px}
+.k{background:var(--flaeche);border:1px solid var(--linie);border-radius:10px;padding:12px 14px;
+  display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start}
+.p{width:14px;height:14px;border-radius:50%;background:var(--mu);margin-top:4px}
+.p.ok{background:var(--ok)} .p.warn{background:var(--warn)} .p.bad{background:var(--bad)}
+.k b{font-weight:600;font-size:.97rem;display:block}
+.k .d{color:var(--mu);font-size:.87rem;margin-top:2px;min-width:0;overflow-wrap:anywhere}
+.k .d code{font-family:var(--mono);font-size:.83rem;background:color-mix(in srgb,var(--mu) 14%,transparent);
+  padding:1px 4px;border-radius:4px}
+
+.bilder{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.bild{width:84px;text-align:center}
+.bild img{width:72px;height:72px;object-fit:contain;background:#ffffff;border:1px solid var(--linie);border-radius:10px;display:block;margin:0 auto 5px}
+.bild span{font-size:.72rem;color:var(--mu);font-family:var(--mono);overflow-wrap:anywhere;display:block}
+
+.hin{margin-top:22px;background:var(--flaeche);border:1px solid var(--linie);border-radius:10px;padding:14px 16px}
+.hin h2{font-family:var(--display);font-size:1rem;margin:0 0 8px}
+.hin ol{margin:0;padding-left:20px;font-size:.92rem}
+.hin li{margin-bottom:6px}
+button{font:inherit;font-weight:600;color:#fff;background:var(--akzent);border:0;border-radius:9px;
+  padding:11px 18px;margin-top:18px;cursor:pointer}
+button:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+.roh{font-family:var(--mono);font-size:.78rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mu);
+  margin-top:8px;max-height:200px;overflow:auto}
+
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <h1>Familien-Planer Diagnose</h1>
+  <p class="sub">Prüft, warum Chrome die App nicht installieren will.<br><span class="adr" id="adr"></span></p>
+
+  <div id="fazit"><h2>Läuft gerade…</h2><p>Einen Moment, die Dateien werden geprüft.</p></div>
+
+  <div class="liste" id="liste"></div>
+
+  <div class="hin">
+    <h2>Was du damit machst</h2>
+    <ol>
+      <li>Mach einen Screenshot von dieser Seite und schick ihn John.</li>
+      <li>Die Bilder unten zeigen, welches Logo wirklich auf dem Server liegt. Altes Logo heißt: falsche Datei ist oben.</li>
+      <li>Rote Punkte sind der Grund, warum die Installation scheitert.</li>
+    </ol>
+  </div>
+
+  <button id="neu">Noch einmal prüfen</button>
+</div>
+
+<script>
+var BASIS = './';
+var liste = document.getElementById('liste');
+var fazit = document.getElementById('fazit');
+
+function karte(titel, stufe, text, extra) {
+  var d = document.createElement('div'); d.className = 'k';
+  var p = document.createElement('div'); p.className = 'p ' + stufe;
+  var b = document.createElement('div');
+  var t = document.createElement('b'); t.textContent = titel;
+  var s = document.createElement('div'); s.className = 'd'; s.innerHTML = text;
+  b.appendChild(t); b.appendChild(s);
+  if (extra) b.appendChild(extra);
+  d.appendChild(p); d.appendChild(b); liste.appendChild(d);
+  return d;
+}
+
+function bilderKasten(pfade) {
+  var box = document.createElement('div'); box.className = 'bilder';
+  pfade.forEach(function (pf) {
+    var w = document.createElement('div'); w.className = 'bild';
+    var i = document.createElement('img');
+    i.src = BASIS + pf + '?frisch=' + Date.now();
+    i.alt = pf;
+    i.onerror = function () { w.querySelector('span').textContent = pf + ' — fehlt'; i.remove(); };
+    var s = document.createElement('span'); s.textContent = pf;
+    w.appendChild(i); w.appendChild(s); box.appendChild(w);
+  });
+  return box;
+}
+
+async function hole(pfad) {
+  try {
+    var r = await fetch(BASIS + pfad + '?frisch=' + Date.now(), { cache: 'no-store' });
+    var txt = r.ok ? await r.text() : '';
+    return { ok: r.ok, code: r.status, typ: r.headers.get('content-type') || '—', txt: txt };
+  } catch (e) { return { ok: false, code: 0, typ: '—', txt: '', fehler: e.message }; }
+}
+
+async function pruefen() {
+  liste.innerHTML = '';
+  fazit.className = ''; fazit.innerHTML = '<h2>Läuft gerade…</h2><p>Einen Moment, die Dateien werden geprüft.</p>';
+  var probleme = [], warnungen = [];
+
+  // 1) Steckbrief
+  var m = await hole('manifest.webmanifest');
+  var mj = null;
+  if (!m.ok) {
+    karte('Steckbrief der App', 'bad', 'Die Datei <code>manifest.webmanifest</code> fehlt (Fehler ' + m.code + '). Ohne sie kann Chrome nie installieren.');
+    probleme.push('Der Steckbrief manifest.webmanifest fehlt auf dem Server.');
+  } else {
+    try { mj = JSON.parse(m.txt); } catch (e) { mj = null; }
+    if (!mj) {
+      karte('Steckbrief der App', 'bad', 'Die Datei ist da, aber kaputt (kein gültiges JSON). Chrome kann sie nicht lesen.', (function () { var p = document.createElement('div'); p.className = 'roh'; p.textContent = m.txt.slice(0, 400); return p; })());
+      probleme.push('Der Steckbrief ist beschädigt und muss neu hochgeladen werden.');
+    } else {
+      var fehlt = [];
+      if (!mj.name && !mj.short_name) fehlt.push('Name');
+      if (!mj.start_url) fehlt.push('Startadresse');
+      if (!['standalone', 'fullscreen', 'minimal-ui'].includes(mj.display)) fehlt.push('Anzeigeart standalone');
+      if (!mj.icons || !mj.icons.length) fehlt.push('Logos');
+      if (fehlt.length) {
+        karte('Steckbrief der App', 'bad', 'Gefunden, aber es fehlt: <b>' + fehlt.join(', ') + '</b>.');
+        probleme.push('Im Steckbrief fehlt: ' + fehlt.join(', ') + '.');
+      } else {
+        karte('Steckbrief der App', 'ok', 'Gefunden und vollständig. Name <code>' + (mj.name || mj.short_name) +
+          '</code>, Anzeigeart <code>' + mj.display + '</code>, ' + mj.icons.length + ' Logo-Einträge.');
+      }
+      if (/octet-stream/.test(m.typ)) {
+        karte('Dateityp des Steckbriefs', 'warn', 'Der Server liefert ihn als <code>' + m.typ + '</code>. Chrome mag das meist trotzdem, manche Browser nicht.');
+        warnungen.push('Der Steckbrief wird mit einem ungewöhnlichen Dateityp ausgeliefert.');
+      }
+    }
+  }
+
+  // 2) Logos aus dem Steckbrief
+  if (mj && mj.icons && mj.icons.length) {
+    var gut = 0, kaputt = [], hat192 = false, hat512 = false;
+    for (var i = 0; i < mj.icons.length; i++) {
+      var ic = mj.icons[i];
+      var pf = String(ic.src || '').replace(/^\.?\//, '');
+      var r = await hole(pf);
+      if (r.ok) { gut++; if (/192/.test(ic.sizes || '')) hat192 = true; if (/512/.test(ic.sizes || '')) hat512 = true; }
+      else kaputt.push(pf);
+    }
+    var bilder = bilderKasten(mj.icons.map(function (x) { return String(x.src || '').replace(/^\.?\//, ''); }));
+    if (!gut) {
+      karte('Logos aus dem Steckbrief', 'bad', 'Keines der ' + mj.icons.length + ' Logos liegt dort, wo der Steckbrief es sucht. <b>Das ist der häufigste Grund, warum Chrome die Installation verweigert.</b> Fehlt: <code>' + kaputt.join('</code> <code>') + '</code>', bilder);
+      probleme.push('Die Logo-Dateien liegen nicht dort, wo der Steckbrief sie sucht.');
+    } else if (!hat192 || !hat512) {
+      karte('Logos aus dem Steckbrief', 'bad', gut + ' von ' + mj.icons.length + ' sind da, aber Chrome braucht eines mit 192 und eines mit 512 Pixeln.', bilder);
+      probleme.push('Es fehlt ein Logo in 192 oder 512 Pixeln.');
+    } else if (kaputt.length) {
+      karte('Logos aus dem Steckbrief', 'warn', gut + ' von ' + mj.icons.length + ' sind da. Es fehlt noch: <code>' + kaputt.join('</code> <code>') + '</code>', bilder);
+      warnungen.push('Einzelne Logo-Dateien fehlen noch.');
+    } else {
+      karte('Logos aus dem Steckbrief', 'ok', 'Alle ' + gut + ' Logos sind da, auch 192 und 512 Pixel. Schau unten nach, ob es wirklich das neue Logo ist.', bilder);
+    }
+  }
+
+  // 3) Hintergrunddienst
+  var sw = await hole('sw.js');
+  if (!sw.ok) {
+    karte('Hintergrunddienst', 'bad', 'Die Datei <code>sw.js</code> fehlt (Fehler ' + sw.code + '). Ohne sie gibt es keine Benachrichtigungen und Chrome installiert nicht.');
+    probleme.push('Die Datei sw.js fehlt auf dem Server.');
+  } else if (!/addEventListener\(\s*['"]fetch/.test(sw.txt)) {
+    karte('Hintergrunddienst', 'bad', 'Die Datei ist da, aber ohne den Teil, den Chrome zum Installieren verlangt.');
+    probleme.push('In sw.js fehlt der fetch-Teil.');
+  } else {
+    var ver = (sw.txt.match(/const\s+C\s*=\s*['"]([^'"]+)/) || [])[1] || '?';
+    karte('Hintergrunddienst', 'ok', 'Gefunden und vollständig. Speicherstand <code>' + ver + '</code>.');
+  }
+
+  // 4) Startseite
+  var ix = await hole('index.html');
+  if (!ix.ok) {
+    karte('Startseite', 'bad', 'Die Startseite antwortet nicht (Fehler ' + ix.code + ').');
+    probleme.push('Die Startseite ist nicht erreichbar.');
+  } else {
+    var href = (ix.txt.match(/<link[^>]+rel=["']manifest["'][^>]*href=["']([^"']+)/i) || ix.txt.match(/<link[^>]+href=["']([^"']+)["'][^>]*rel=["']manifest["']/i) || [])[1];
+    var swReg = /serviceWorker\s*\.\s*register|serviceWorker['"\]\s]*\)?\s*\.register/.test(ix.txt) || /navigator\.serviceWorker/.test(ix.txt);
+    var ikon = [];
+    var re = /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi, t;
+    while ((t = re.exec(ix.txt))) { var h = (t[0].match(/href=["']([^"']+)/) || [])[1]; if (h) ikon.push(h); }
+    if (!href) {
+      karte('Startseite', 'bad', 'Auf der Startseite fehlt der Verweis auf den Steckbrief. Chrome findet ihn dann nicht.');
+      probleme.push('Auf der Startseite fehlt der Verweis auf den Steckbrief.');
+    } else if (href.replace(/^\.?\//, '') !== 'manifest.webmanifest') {
+      karte('Startseite', 'warn', 'Die Startseite zeigt auf <code>' + href + '</code> statt auf <code>manifest.webmanifest</code>.');
+      warnungen.push('Die Startseite zeigt auf einen anderen Steckbrief: ' + href);
+    } else {
+      karte('Startseite', 'ok', 'Zeigt richtig auf <code>manifest.webmanifest</code>' + (swReg ? ' und startet den Hintergrunddienst.' : '.'));
+    }
+    if (ikon.length) {
+      karte('Logo der Startseite', 'ok', 'Die Startseite benutzt für das Lesezeichen-Logo: <code>' + ikon.join('</code> <code>') + '</code>. Samsung Internet nimmt beim „Zum Startbildschirm“ genau dieses Bild, nicht das aus dem Steckbrief.', bilderKasten(ikon.map(function (x) { return x.replace(/^\.?\//, ''); })));
+    }
+  }
+
+  // 5) Alte Reste, die dazwischenfunken können
+  var reste = ['favicon.ico', 'apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+  var da = [];
+  for (var j = 0; j < reste.length; j++) { var rr = await hole(reste[j]); if (rr.ok) da.push(reste[j]); }
+  if (da.length) {
+    karte('Alte Logo-Dateien auf dem Server', 'warn', 'Zusätzlich liegen dort: <code>' + da.join('</code> <code>') +
+      '</code>. Wenn darunter das alte Logo ist, zeigt Samsung Internet genau das. Sieh unten nach.', bilderKasten(da.filter(function (x) { return !/\.ico$/.test(x); })));
+    warnungen.push('Es liegen weitere Logo-Dateien herum: ' + da.join(', '));
+  } else {
+    karte('Alte Logo-Dateien auf dem Server', 'ok', 'Keine alten Reste gefunden, die dazwischenfunken könnten.');
+  }
+
+  // 6) App-Verknüpfung (TWA)
+  var al = await hole('.well-known/assetlinks.json');
+  if (al.ok) {
+    var paket = (al.txt.match(/"package_name"\s*:\s*"([^"]+)"/) || [])[1] || '?';
+    karte('Verknüpfung mit der Android-App', 'ok', 'Gefunden, verknüpft mit <code>' + paket + '</code>. Das ist für deine APK nötig und stört die Installation nicht.');
+  } else {
+    karte('Verknüpfung mit der Android-App', 'warn', 'Nicht gefunden. Für die Webseite egal, aber dann zeigt deine APK oben die Adresszeile.');
+    warnungen.push('Die Datei assetlinks.json ist nicht erreichbar.');
+  }
+
+  // Fazit
+  if (probleme.length) {
+    fazit.className = 'bad';
+    fazit.innerHTML = '<h2>Gefunden: ' + probleme.length + ' Problem' + (probleme.length > 1 ? 'e' : '') + '</h2><p>' + probleme.join('<br>') + '</p>';
+  } else if (warnungen.length) {
+    fazit.className = 'warn';
+    fazit.innerHTML = '<h2>Die Seite ist in Ordnung</h2><p>Chrome müsste installieren können. Es gibt nur Kleinigkeiten:<br>' + warnungen.join('<br>') +
+      '</p><p style="margin-top:8px">Wenn Chrome trotzdem meckert, liegt es am Handy, nicht an der Seite.</p>';
+  } else {
+    fazit.className = 'ok';
+    fazit.innerHTML = '<h2>Alles in Ordnung</h2><p>Jede Datei liegt richtig. Verweigert Chrome die Installation trotzdem, liegt es am Handy und nicht an der Seite.</p>';
+  }
+}
+
+document.getElementById('neu').onclick = pruefen;
+pruefen();
+</script>
+
+<script>document.getElementById('adr').textContent=location.host;</script>
+</body>
+</html>
