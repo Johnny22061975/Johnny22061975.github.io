@@ -1212,7 +1212,7 @@ function helpSheetHTML(){
   +H('Ein Rad dreht sich zu schnell oder zu langsam','<p>Menü → <b>Darstellung · Datum & Uhrzeit</b> → Tempo der Räder: Ruhig, Normal oder Schnell. Oder Menü → „Liste (Auswahlfenster)“ statt Rad.</p>')
   +'<h3>💬 Rückmeldung schicken</h3><p class="hint">Was gefällt dir nicht, was fehlt, was ist dir aufgefallen? Schreib es einfach hier rein.</p><textarea id="fbText" rows="3" maxlength="1000" placeholder="Deine Rückmeldung …">'+esc(S.fbDraft||'')+'</textarea><div class="btns"><button type="button" class="btn pri" data-a="fbsend">Abschicken</button></div>'
   +(function(){ var L=(S.feedback||[]).slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); if(!L.length) return ''; return H('📋 Alle Rückmeldungen ('+L.length+')',L.map(function(x){ return '<div class="fbi"><div class="fbh"><b>'+esc(x.by&&S.people[x.by]?pname(x.by):(x.email||'Jemand'))+'</b><span>'+esc(fmtTime(x.ts||0))+'</span><button type="button" class="linkb" data-a="fbdel" data-id="'+esc(x.id)+'">'+(S.fbDel===x.id?'Wirklich löschen?':'Löschen')+'</button></div><p>'+esc(x.text||'').replace(/\n/g,'<br>')+'</p></div>'; }).join('')); })()
-  +'</div><div class="btns"><button type="button" class="btn grow" data-a="mback">'+ic('chevL',18)+' Zurück</button></div>';
+  +'</div>';
 }
 function contactSheetHTML(){ var f=S.cform, act=activePeople();
   var owners=[['','Familie']].concat(act.map(function(k){ return [k,pname(k)]; }));
@@ -1927,7 +1927,7 @@ function settingsSheetHTML(){
     body='<div class="fld"><span class="lbl">Familie und Weitere</span>'+rows+'<p class="hint">Tippe auf den farbigen Punkt, um die Farbe zu ändern. Bis zu 20 Personen, zum Beispiel auch Oma oder eine Firma. „Anzeigen“ blendet eine Person aus, ohne sie zu löschen. ⏰ = Schicht-Wecker: Nur diese Personen erscheinen unter „Erinnerungen & Wecker“ bei den Schicht-Weckern.</p></div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
   var lockable=['darst','stil','farben','reiter','wecker','familie'].indexOf(pg)>-1, locked=lockable&&!S.lookEdit;
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
-  return shHead(title)+body+'<div class="btns"><button type="button" class="btn grow" data-a="mback">'+ic('chevL',18)+' Zurück</button></div>';
+  return shHead(title)+body;
 }
 function shTop(){ var e=document.querySelector('.sheet'); if(e) e.scrollTop=0; }
 function goPage(v){ v=v||''; var cur=S.menuPage||'';
