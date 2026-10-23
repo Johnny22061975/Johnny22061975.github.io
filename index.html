@@ -258,6 +258,10 @@ textarea{resize:vertical}
 .btn.dng{background:#c0392b;color:#fff;border-color:#c0392b}
 .pcol{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 0 4px 30px}
 .sw{width:32px;height:32px;border-radius:50%;border:2px solid var(--line2);cursor:pointer;padding:0}
+.sws .swl{border-radius:10px}
+.eigw{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.eigc{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.eigc input{width:64px;height:38px;border:1px solid var(--line2);border-radius:10px;background:none;padding:2px;cursor:pointer}
 .swc{display:flex;align-items:center;gap:6px;font-size:14px}
 .filechip{position:relative;overflow:hidden;cursor:pointer}
 .filechip input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;font-size:0}
@@ -641,7 +645,7 @@ function defaultMuell(){ var o={}; BINS.forEach(function(b){ o[b.k]={every:2,nex
 var S = {
   store:null, mode:'', shifts:{}, plans:{}, planSeq:{}, planForm:null, events:[], shop:[], notes:[], contacts:[], chats:[], citems:[], ctabs:[], chatOpen:'', chatNew:null, abWho:'all', abQ:'', people:defaultPeople(), muell:defaultMuell(), loaded:{},
   pick:(lsGet('pick')==='liste'?'liste':'rad'), wi:([40,50,60].indexOf(+lsGet('wi'))>-1?+lsGet('wi'):50), me:(lsGet('me')||null), tab:'cal', view:'month', sel:ymd(new Date()),
-  shopFilter:'all', shopWho:'', sheet:null, form:null, canWrite:true, sample:null
+  shopFilter:'all', shopWho:'', sheet:null, form:null, canWrite:true, sample:null, mstack:[]
 };
 
 function pname(k){ return (S.people[k]&&S.people[k].name)||k; }
@@ -800,8 +804,7 @@ function renderNotice(){
 var TABS=['cal','muell','shop','notes','school','addr'];
 function ensureGuard(){ try{ if((S.sheet||S.tab!=='cal')&&!S.guard&&window.history&&history.pushState){ history.pushState({fpg:Date.now()},''); S.guard=true; } }catch(e){} }
 window.addEventListener('popstate',function(){ S.guard=false;
-  if(S.sheet==='settings'&&S.menuPage){ S.menuPage=''; renderSheet(); }
-  else if(S.sheet==='help'){ S.sheet='settings'; S.menuPage=''; renderSheet(); }
+  if(S.sheet==='help'||(S.sheet==='settings'&&((S.mstack&&S.mstack.length)||S.menuPage))){ goBack(); }
   else if(S.sheet){ closeSheet(); }
   else if(S.chatOpen&&S.tab==='notes'){ S.chatOpen=''; renderNotes(); }
   else if(S.tab!=='cal'){ S.tab='cal'; renderTabs(); window.scrollTo(0,0); }
@@ -1204,7 +1207,7 @@ function helpSheetHTML(){
   +H('Ein Rad dreht sich zu schnell oder zu langsam','<p>Menü → <b>Darstellung · Datum & Uhrzeit</b> → Tempo der Räder: Ruhig, Normal oder Schnell. Oder Menü → „Liste (Auswahlfenster)“ statt Rad.</p>')
   +'<h3>💬 Rückmeldung schicken</h3><p class="hint">Was gefällt dir nicht, was fehlt, was ist dir aufgefallen? Schreib es einfach hier rein.</p><textarea id="fbText" rows="3" maxlength="1000" placeholder="Deine Rückmeldung …">'+esc(S.fbDraft||'')+'</textarea><div class="btns"><button type="button" class="btn pri" data-a="fbsend">Abschicken</button></div>'
   +(function(){ var L=(S.feedback||[]).slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); if(!L.length) return ''; return H('📋 Alle Rückmeldungen ('+L.length+')',L.map(function(x){ return '<div class="fbi"><div class="fbh"><b>'+esc(x.by&&S.people[x.by]?pname(x.by):(x.email||'Jemand'))+'</b><span>'+esc(fmtTime(x.ts||0))+'</span><button type="button" class="linkb" data-a="fbdel" data-id="'+esc(x.id)+'">'+(S.fbDel===x.id?'Wirklich löschen?':'Löschen')+'</button></div><p>'+esc(x.text||'').replace(/\n/g,'<br>')+'</p></div>'; }).join('')); })()
-  +'</div><div class="btns"><button type="button" class="btn" data-a="helpback">Zurück zum Menü</button><button type="button" class="btn pri grow" data-a="close">Schließen</button></div>';
+  +'</div><div class="btns"><button type="button" class="btn grow" data-a="mback">'+ic('chevL',18)+' Zurück</button><button type="button" class="btn pri grow" data-a="close">Schließen</button></div>';
 }
 function contactSheetHTML(){ var f=S.cform, act=activePeople();
   var owners=[['','Familie']].concat(act.map(function(k){ return [k,pname(k)]; }));
@@ -1882,9 +1885,13 @@ function weckerHTML(){ var act=activePeople().filter(hasShAlarm), A=S.alarms||{}
         :'<span style="flex:0 0 auto;color:var(--ink-2);font-size:14px">'+(a.on?'⏰ '+esc(a.t||'05:00'):'aus')+'</span><button type="button" class="btn sm" data-a="aledit" data-v="'+k+'|'+c[0]+'">Ändern</button>')
         +'<input type="checkbox" data-alon="'+k+'|'+c[0]+'"'+(a.on?' checked':'')+' aria-label="Wecker an"></div>'; }).join('')+phoneAlarmHTML(k)+'</div>'; }).join('')+'</div>'
    +'<button type="button" class="btn sm" data-a="altest">🔔 Testklingeln</button>'; }
+function shHead(title,root){
+  return '<div class="sh-h">'+(root?'<span style="width:44px"></span>':'<button type="button" class="btn sm" data-a="mback" aria-label="Eine Seite zurück">'+ic('chevL',18)+' Zurück</button>')
+    +'<h2 style="flex:1;text-align:center;font-size:18px;margin:0">'+esc(title)+'</h2>'
+    +'<button class="icon-btn" data-a="close" aria-label="Zur Monatsübersicht">'+ic('x')+'</button></div>'; }
 function settingsSheetHTML(){
   var pg=S.menuPage||'';
-  if(!pg) return '<div class="sh-h"><h2>Menü</h2><button class="icon-btn" data-a="close" aria-label="Schließen">'+ic('x')+'</button></div>'
+  if(!pg) return shHead('Menü',true)
     +'<div class="mlist">'
     +(S.fbUser&&!(S.settingsRows&&S.settingsRows.migrated)?'<label class="mrow filebtn" style="position:relative"><span class="mi">📦</span><span class="mt">Daten aus der Claude-Version übernehmen</span><span class="ms">Datei umzug.json wählen</span>'+ic('chevR',18)+'<input type="file" class="impfile" accept=".json,application/json"></label>':'')
     +MENUP.map(function(m){ return '<button type="button" class="mrow" data-a="mpage" data-v="'+m[0]+'"><span class="mi">'+m[1]+'</span><span class="mt">'+esc(m[2])+'</span><span class="ms">'+esc(menuSummary(m[0]))+'</span>'+ic('chevR',18)+'</button>'; }).join('')+'<button type="button" class="mrow" data-a="help"><span class="mi">❓</span><span class="mt">Hilfe & Tipps</span><span class="ms">Auch: Rückmeldung schicken</span>'+ic('chevR',18)+'</button></div>'
@@ -1895,8 +1902,10 @@ function settingsSheetHTML(){
     +(function(){ var sp=lsGet('shape')||'', mapR={sq:2,sl:6,pill:30}, kind=(sp==='r'||mapR[sp]!==undefined)?'r':(sp==='oct'||sp==='cut')?'oct':'', rv=parseFloat(lsGet('radv')); if(!(rv>=0)) rv=mapR[sp]!==undefined?mapR[sp]:10; var cv=parseFloat(lsGet('cutv')); if(!(cv>=0)) cv=9; var mh=parseFloat(lsGet('mch'))||84, bh=parseFloat(lsGet('btnh'))||44; return '<div class="fld"><span class="lbl">Form der Kästchen und Knöpfe</span><div class="chips">'+[['','Standard'],['r','Rund / Eckig'],['oct','Achteckig']].map(function(o){ return '<button type="button" class="chip" data-a="shape" data-v="'+o[0]+'" aria-pressed="'+(kind===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div>'+(kind==='r'?'<span class="lbl">Rundung: <b id="radl">'+rv+' px</b></span><input type="range" id="radr" class="rng" min="0" max="30" step="1" value="'+rv+'" aria-label="Rundung"><div class="rngl"><span>▢ eckig</span><span>oval ⬭</span></div>':'')+(kind==='oct'?'<span class="lbl">Ecken abschrägen: <b id="cutl">'+cv+' px</b></span><input type="range" id="cutr" class="rng" min="2" max="18" step="1" value="'+cv+'" aria-label="Ecken abschrägen"><div class="rngl"><span>wenig</span><span>stark</span></div>':'')+'</div>'+'<div class="fld"><span class="lbl">Größe der Kalender-Kästchen: <b id="mchl">'+mh+' px</b></span><input type="range" id="mchr" class="rng" min="56" max="150" step="2" value="'+mh+'" aria-label="Kästchen-Größe"><div class="rngl"><span>flach</span><span>hoch</span></div>'+'<span class="lbl">Größe der Knöpfe: <b id="btnhl">'+bh+' px</b></span><input type="range" id="btnhr" class="rng" min="32" max="60" step="2" value="'+bh+'" aria-label="Knopf-Größe"><div class="rngl"><span>klein</span><span>groß</span></div></div>'+'<div class="btns"><button type="button" class="btn sm" data-a="lookreset">Form, Größe und Kontur zurücksetzen</button></div><p class="hint">Gilt nur für dieses Gerät. Beim Schieben siehst du die Änderung sofort.</p>'; })();
   else if(pg==='stil'){ var m=menuStyleVars(); body=bgTabChips()+'<div class="fld"><span class="lbl">Art auswählen</span><div class="stylechips">'+BGSTYLES.map(function(x){ return '<button type="button" class="chip" data-a="bgstyle" data-v="'+x.k+'" aria-pressed="'+(bgEdGet('bgm')==='col'&&x.k===m.cur)+'">'+esc(x.l)+'</button>'; }).join('')+'</div>'
       +'<div class="chips"><button type="button" class="chip" data-a="bgnone" aria-pressed="'+(!bgEdGet('bgm'))+'">Standard</button>'+(S.bgEdit?'':'<label class="chip filechip" aria-pressed="'+(lsGet('bgm')==='img')+'">Eigenes Bild<input type="file" id="bgfile" accept="image/*"></label>')+'</div><p class="hint">Nach dem Antippen einer Art geht es weiter zu den Farben. Gilt nur für dieses Gerät.</p></div>'; }
-  else if(pg==='farben'){ var m2=menuStyleVars(), ui=m2.ui; body='<p class="hint">Gilt für: <b>'+esc((BGTABS.concat((S.ctabs||[]).map(function(c){ return ['c_'+c.id,c.name]; })).filter(function(o){ return o[0]===(S.bgEdit||''); })[0]||['','Alle Reiter'])[1])+'</b></p><div class="fld"><span class="lbl">Farben für „'+esc(ui.l)+'“</span><div class="sws">'+ui.cols.map(function(c,i){ var tr=bgTriple(ui,i,m2.dk); return '<button type="button" class="sw" style="background:'+bgImage(ui,tr,i)+'" data-a="bgcol" data-s="'+ui.k+'" data-v="'+i+'" aria-pressed="'+(m2.on&&m2.v===String(i))+'" aria-label="'+esc(ui.l)+' '+(ui.names?ui.names[i]:'Farbe '+(i+1))+'"></button>'; }).join('')
-      +(ui.season?'<button type="button" class="chip" data-a="bgcol" data-s="season" data-v="a" aria-pressed="'+(m2.on&&m2.v==='a')+'">Automatisch nach Jahreszeit</button>':'')+'</div><p class="hint">Andere Art? Zurück und unter „Hintergrund · Farbstil“ wählen.</p><button type="button" class="btn sm" data-a="mpage" data-v="stil">Art wechseln</button></div>'; }
+  else if(pg==='farben'){ var m2=menuStyleVars(), ui=m2.ui; body='<p class="hint">Gilt für: <b>'+esc((BGTABS.concat((S.ctabs||[]).map(function(c){ return ['c_'+c.id,c.name]; })).filter(function(o){ return o[0]===(S.bgEdit||''); })[0]||['','Alle Reiter'])[1])+'</b></p><div class="fld"><span class="lbl">Farben für „'+esc(ui.l)+'“</span><div class="sws">'+sCols(ui).map(function(c,i){ var tr=bgTriple(ui,i,m2.dk); return '<button type="button" class="sw'+(ui.k==='logo'?' swl':'')+'" style="background:'+bgImage(ui,tr,i)+';background-size:cover;background-position:center" data-a="bgcol" data-s="'+ui.k+'" data-v="'+i+'" aria-pressed="'+(m2.on&&m2.v===String(i))+'" aria-label="'+esc(ui.l)+' '+(ui.names?ui.names[i]:'Farbe '+(i+1))+'"></button>'; }).join('')+'</div>'
+      +(ui.names?'<p class="hint">'+ui.names.map(function(n,i){ return (i+1)+'. '+esc(n); }).join(' · ')+'</p>':'')
+      +(ui.eigen?(function(){ var ec=eigenCols()[0]; return '<div class="eigw">'+[['Grundfarbe',0],['Mitte',1],['Zweite Farbe',2]].map(function(o){ return '<label class="eigc"><span>'+o[0]+'</span><input type="color" data-eig="'+o[1]+'" value="'+ec[o[1]]+'"></label>'; }).join('')+'</div><p class="hint">Such dir drei Farben aus. Das Feld oben ändert sich sofort mit. Tipp danach darauf, damit die Farben übernommen werden.</p>'; })():'')
+      +'<p class="hint">Andere Art? Mit „Zurück“ oben kommst du eine Seite zurück.</p><button type="button" class="btn sm" data-a="mpage" data-v="stil">Art wechseln</button></div>'; }
   else if(pg==='wecker') body=pushHTML()+weckerHTML();
   if(pg==='darst'||pg==='zeit') body+='<div class="fld"><span class="lbl">Datum und Uhrzeit auswählen</span><div class="chips">'+[['rad','Rad (scrollen)'],['liste','Liste (Auswahlfenster)']].map(function(o){ return '<button type="button" class="chip" data-a="pickmode" data-v="'+o[0]+'" aria-pressed="'+(S.pick===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät.</p></div>'
     +'<div class="fld"><span class="lbl">Tempo der Räder</span><div class="chips">'+[[60,'Ruhig'],[50,'Normal'],[40,'Schnell']].map(function(o){ return '<button type="button" class="chip" data-a="wi" data-v="'+o[0]+'" aria-pressed="'+(WI()===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Bei „Ruhig“ läuft das Rad bei gleicher Wischbewegung weniger weit.</p></div>';
@@ -1914,9 +1923,22 @@ function settingsSheetHTML(){
     body='<div class="fld"><span class="lbl">Familie und Weitere</span>'+rows+'<p class="hint">Tippe auf den farbigen Punkt, um die Farbe zu ändern. Bis zu 20 Personen, zum Beispiel auch Oma oder eine Firma. „Anzeigen“ blendet eine Person aus, ohne sie zu löschen. ⏰ = Schicht-Wecker: Nur diese Personen erscheinen unter „Erinnerungen & Wecker“ bei den Schicht-Weckern.</p></div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
   var lockable=['darst','stil','farben','reiter','wecker','familie'].indexOf(pg)>-1, locked=lockable&&!S.lookEdit;
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
-  return '<div class="sh-h"><button type="button" class="btn sm" data-a="mpage" data-v="">‹ Menü</button><h2 style="flex:1;text-align:center;font-size:18px">'+esc(title)+'</h2><button class="icon-btn" data-a="close" aria-label="Schließen">'+ic('x')+'</button></div>'+body
-    +'<div class="btns"><button type="button" class="btn" data-a="mpage" data-v="">Zurück zum Menü</button><button type="button" class="btn pri grow" data-a="close">Fertig</button></div>';
+  return shHead(title)+body+'<div class="btns"><button type="button" class="btn grow" data-a="mback">'+ic('chevL',18)+' Zurück</button><button type="button" class="btn pri grow" data-a="close">Fertig</button></div>';
 }
+function shTop(){ var e=document.querySelector('.sheet'); if(e) e.scrollTop=0; }
+function goPage(v){ v=v||''; var cur=S.menuPage||'';
+  if(v===cur){ renderSheet(); shTop(); return; }
+  if(v==='') S.mstack=[]; else { S.mstack=S.mstack||[]; S.mstack.push(cur); if(S.mstack.length>12) S.mstack.shift(); }
+  S.menuPage=v; renderSheet(); shTop(); }
+// Genau einen Schritt zurück: erst in der Hilfe, dann im Menü, zuletzt schließen
+function goBack(){
+  if(S.sheet==='help'){ S.sheet='settings'; renderSheet(); shTop(); return true; }
+  if(S.sheet==='settings'){
+    var st=S.mstack||[];
+    if(st.length){ S.menuPage=st.pop()||''; renderSheet(); shTop(); return true; }
+    if(S.menuPage){ S.menuPage=''; renderSheet(); shTop(); return true; }
+  }
+  closeSheet(); return false; }
 function lockBg(on){ var b=document.body; if(on&&!S.lockY&&!b.classList.contains('locked')){ S.lockY=window.scrollY||0; b.style.top=(-S.lockY)+'px'; b.classList.add('locked'); } else if(!on&&b.classList.contains('locked')){ var y=S.lockY||0; b.classList.remove('locked'); b.style.top=''; S.lockY=0; window.scrollTo(0,y); } }
 function renderSheet(){
   try{ updChatPop(); }catch(e){}
@@ -2090,8 +2112,8 @@ document.addEventListener('click',function(e){
     case 'lsave': saveLesson(false); break;
     case 'ldel': if(S.lform){ if(!S.lform.delAsk){ S.lform.delAsk=true; renderSheet(); break; } saveLesson(true); } break;
     case 'ldate': if(S.lform){ var lf=S.lform, ev2=S.events.filter(function(x){ return x.id===lf.evId; })[0], nd2=addDays(lf.date,7*(+t.dataset.n)), g2=0; while(ev2&&!occursOn(ev2,nd2)&&g2<20){ nd2=addDays(nd2,7*(+t.dataset.n)); g2++; } if(nd2>=ymd(new Date())) lf.date=nd2; renderSheet(); } break;
-    case 'help': S.sheet='help'; renderSheet(); var hs=document.querySelector('.sheet'); if(hs) hs.scrollTop=0; break;
-    case 'helpback': S.sheet='settings'; S.menuPage=''; renderSheet(); break;
+    case 'help': S.sheet='help'; renderSheet(); shTop(); break;
+    case 'helpback': goBack(); break;
     case 'ctedit': openContact(t.dataset.id); break;
     case 'abwho': S.abWho=t.dataset.k; renderAddr(); break;
     case 'ctowner': if(S.cform){ S.cform.owner=t.dataset.k; renderSheet(); } break;
@@ -2122,14 +2144,15 @@ document.addEventListener('click',function(e){
     case 'bgcol': (function(){ var sf=S.bgEdit?'@'+S.bgEdit:''; lsSet('bgm'+sf,'col'); lsSet('bgs'+sf,t.dataset.s||'metal'); lsSet('bgv'+sf,t.dataset.v); })(); applyBg(); renderSheet(); break;
     case 'bgtab': S.bgEdit=t.dataset.v||''; S.bgUi=null; applyBg(); renderSheet(); break;
     case 'bgsame': if(S.bgEdit){ ['bgm','bgs','bgv'].forEach(function(k){ lsSet(k+'@'+S.bgEdit,''); }); applyBg(); renderSheet(); } break;
-    case 'bgstyle': S.bgUi=t.dataset.v; S.menuPage='farben'; renderSheet(); var shs=document.querySelector('.sheet'); if(shs) shs.scrollTop=0; break;
+    case 'bgstyle': S.bgUi=t.dataset.v; goPage('farben'); break;
     case 'rowmv': var ro=rowOrder(), vis=ro.filter(function(k){ return k==='bins'||activePeople().indexOf(k)>-1; }), ix=vis.indexOf(t.dataset.k), jx=ix+(+t.dataset.n); if(ix>-1&&jx>=0&&jx<vis.length){ var tmp=vis[ix]; vis[ix]=vis[jx]; vis[jx]=tmp; var rest=ro.filter(function(k){ return vis.indexOf(k)<0; }), nro=vis.concat(rest); lsSet('roworder',JSON.stringify(nro)); if(S.me&&S.store){ var RO=JSON.parse(JSON.stringify(S.rowOrd||{})); RO[S.me]=nro; S.rowOrd=RO; saveSettings('roworder',{p:RO}); } renderCal(); renderSheet(); } break;
     case 'shlay': lsSet('shlay',t.dataset.v); applyLook(); renderCal(); renderSheet(); break;
     case 'contour': lsSet('contour',t.dataset.v); applyLook(); renderSheet(); break;
     case 'ctcol': lsSet('ctcol',t.dataset.v==='own'?'hsl(300, 90%, 55%)':t.dataset.v); applyLook(); renderSheet(); break;
     case 'shape': lsSet('shape',t.dataset.v); applyLook(); renderCal(); renderSheet(); break;
     case 'lookreset': ['shape','radv','cutv','mch','btnh','bwv','contour','ctcol'].forEach(function(k){ try{ localStorage.removeItem('fp2_'+k); }catch(e){} }); ['--rad','--cut','--mch','--btnh','--bw','--bcol'].forEach(function(v){ document.documentElement.style.removeProperty(v); }); applyLook(); renderCal(); renderSheet(); break;
-    case 'mpage': S.menuPage=t.dataset.v; renderSheet(); var shm=document.querySelector('.sheet'); if(shm) shm.scrollTop=0; break;
+    case 'mpage': goPage(t.dataset.v); break;
+    case 'mback': goBack(); break;
     case 'bgnone': if(S.bgEdit){ lsSet('bgm@'+S.bgEdit,'std'); applyBg(); renderSheet(); break; } lsSet('bgm',''); try{ localStorage.removeItem('fp2_bgimg'); }catch(x){} applyBg(); renderSheet(); break;
     case 'theme': S.theme=t.dataset.v; lsSet('theme',S.theme); applyTheme(); renderSheet(); break;
     case 'plan': openPlan(); break;
@@ -2254,6 +2277,9 @@ document.addEventListener('input',function(e){
   if(el.id==='bwr'){ lsSet('bwv',el.value); applyLook(); var bl=$('#bwvl'); if(bl) bl.textContent=String(el.value).replace('.',',')+' px'; return; }
   if(el.id==='cthue'||el.id==='ctlig'){ var hh=$('#cthue').value, ll=$('#ctlig').value, col='hsl('+hh+', 90%, '+ll+'%)'; lsSet('ctcol',col); applyLook(); var pv=$('#ctprev'); if(pv) pv.style.borderColor=col; $('#ctlig').style.setProperty('--h',hh); return; }
   if(el.id==='citNote'){ var cn3=ctab(); if(!cn3) return; clearTimeout(S.noteT); S.noteT=setTimeout(function(){ safe(function(){ return S.store.set('citems','note_'+cn3.id,{tab:cn3.id,kind:'note',text:el.value.slice(0,5000),by:S.me||'',ts:Date.now()}); }); },700); return; }
+  if(el.dataset&&el.dataset.eig!==undefined){ var ec=eigenCols()[0].slice(); ec[+el.dataset.eig]=el.value; lsSet('bgeig',ec.join(','));
+    var sw0=document.querySelector('.sws .sw'); if(sw0){ var dk2=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); sw0.style.background=bgImage(BGST.eigen,bgTriple(BGST.eigen,0,dk2),0); }
+    if(bgEdGet('bgm')==='col'&&bgEdGet('bgs')==='eigen') applyBg(); return; }
   if(el.id==='citNew') return;
   if(el.id==='abq'){ S.abQ=el.value; renderAddrList(); return; }
   if(el.id==='fbText'){ S.fbDraft=el.value; return; }
@@ -2485,21 +2511,31 @@ var BGCOL=[[['#2f6fd0','#8fc0ff','#2a5fb8'],['#0f2f66','#3f7fd8','#0c2552']],[['
 var BGSTYLES=[
  {k:'metal',l:'Metallic',kind:'metal',tone:'mid',cols:BGCOL},
  {k:'beige',l:'Beige matt',kind:'matt',tone:'light',cols:[['#e8dcc6','#f3ece0','#d9c9ad'],['#d8d3ca','#ebe7e0','#c7c0b4'],['#d9b8a0','#ecd8c8','#c9a084'],['#c9d3c0','#e2e8db','#b4c1a8'],['#c4b5a5','#dcd1c4','#ad9c8a'],['#9aa0a6','#b8bdc2','#80868d']]},
- {k:'neon',l:'Neon / Graffiti',kind:'neon',tone:'dark',cols:[['#0d0d17','#ff2bd6','#00f0ff'],['#0b0f0c','#39ff14','#ffe600'],['#100a14','#ff6a00','#b026ff'],['#0a0d18','#00b3ff','#ff2b4f'],['#120a0a','#ff1f5a','#ffd000'],['#0a1212','#00ffa3','#ff00aa']]},
- {k:'pastell',l:'Pastell',kind:'multi',tone:'light',cols:[['#f7c6d9','#fde4ee','#f2b0c8'],['#bfe9d6','#e0f6ec','#a6dfc5'],['#d7c8f2','#ece4fa','#c4b0ec'],['#c3dcf5','#e2eefb','#a9cbef'],['#fbd3b8','#fde8da','#f7bf9b'],['#f6eaa8','#fbf4d2','#efdd84']]},
+ {k:'neon',l:'Neon / Graffiti',kind:'neon',tone:'dark',cols:[['#0d0d17','#ff2bd6','#00f0ff'],['#0b0f0c','#39ff14','#ffe600'],['#100a14','#ff6a00','#b026ff'],['#0a0d18','#00b3ff','#ff2b4f'],['#120a0a','#ff1f5a','#ffd000'],['#0a1212','#00ffa3','#ff00aa'],['#0d0a16','#7c4dff','#00e5ff'],['#140a0f','#ff3d00','#ffea00'],['#060f14','#18ffff','#64ffda'],['#130d08','#ffab00','#ff5252'],['#0f0618','#e040fb','#536dfe'],['#02120a','#76ff03','#00e676'],['#150612','#ff4081','#ffd740'],['#071018','#40c4ff','#b388ff']]},
+ {k:'pastell',l:'Pastell',kind:'multi',tone:'light',cols:[['#f7c6d9','#fde4ee','#f2b0c8'],['#bfe9d6','#e0f6ec','#a6dfc5'],['#d7c8f2','#ece4fa','#c4b0ec'],['#c3dcf5','#e2eefb','#a9cbef'],['#fbd3b8','#fde8da','#f7bf9b'],['#f6eaa8','#fbf4d2','#efdd84'],['#b8e3ee','#dcf3f8','#92d2e3'],['#e8cdbb','#f6e5da','#d6b096'],['#cfe4b0','#e8f3d6','#b4d388'],['#f2c4c4','#fbe2e2','#e7a3a3'],['#cdd2f0','#e5e8f9','#b0b8e6'],['#f0d4ee','#faeaf9','#e3b4df'],['#d6ead9','#ecf5ed','#b9d9be'],['#f9ddc2','#fdf0e3','#f0c39a']]},
  {k:'natur',l:'Natur',kind:'multi',tone:'mid',cols:[['#2f5d3a','#5f8f5a','#1f4229'],['#6b7f3a','#9bb062','#4f5f28'],['#7a5233','#a67b52','#5a3b22'],['#b08f52','#d6bd88','#8f7038'],['#6f6a62','#9a948a','#524e48'],['#a5562a','#d08a4a','#7a3d1c']]},
  {k:'retro',l:'Retro',kind:'multi',tone:'mid',cols:[['#d4a017','#e8c35a','#b5860f'],['#e0672b','#f29a5c','#c2501c'],['#1f6f78','#3f9aa3','#165259'],['#7a7a2e','#a3a352','#5c5c20'],['#8a2e3b','#b5525f','#6a1f2b'],['#7b4a2a','#a8714a','#5c341b']]},
- {k:'ozean',l:'Ozean',kind:'multi',tone:'mid',cols:[['#1fb5b0','#7fe0dc','#138f8b'],['#0b3b6f','#2a6fb0','#062a52'],['#2a9d8f','#76c9bf','#1d7468'],['#3c5566','#6a8698','#283b48'],['#e05a46','#ff9f8f','#c4412f'],['#1b6fa8','#e0c78f','#0f4f7d']]},
+ {k:'ozean',l:'Ozean',kind:'multi',tone:'mid',cols:[['#1fb5b0','#7fe0dc','#138f8b'],['#0b3b6f','#2a6fb0','#062a52'],['#2a9d8f','#76c9bf','#1d7468'],['#3c5566','#6a8698','#283b48'],['#e05a46','#ff9f8f','#c4412f'],['#1b6fa8','#e0c78f','#0f4f7d'],['#004e64','#2a9dbb','#00303f'],['#0f766e','#5eead4','#0a4f49'],['#145da0','#89c2f0','#0b3c69'],['#065a82','#9ad1e8','#03405e'],['#1d3f5e','#4a7fa8','#11293d'],['#0d7377','#44c2c6','#07494c'],['#2e6f95','#a7cbe3','#1c4a66'],['#013a63','#468faf','#01253f']]},
  {k:'sunset',l:'Sonnenuntergang',kind:'multi',tone:'mid',cols:[['#ff7e3d','#ff4f8b','#7b3fd0'],['#ffb347','#ff6f61','#c2185b'],['#f9a423','#ff6f3c','#d6336c'],['#ff9a8b','#ff6a88','#8e44ad'],['#fa709a','#f6b83a','#ff8c42'],['#355c7d','#c06c84','#f67280']]},
  {k:'edel',l:'Edel',kind:'edel',tone:'dark',cols:[['#111111','#c9a227','#1a1a1a'],['#3d0a12','#c9a227','#2a060c'],['#0c1530','#c9a227','#081024'],['#0b2e22','#c9a227','#071f17'],['#111111','#c0c4cc','#1a1a1a'],['#4a0d1e','#e0b84a','#2e0612']]},
- {k:'skandi',l:'Skandinavisch / Holz',kind:'matt',tone:'light',cols:[['#f1eee8','#ffffff','#e3ded4'],['#dfe1e3','#eef0f1','#cdd0d3'],['#e6d5bb','#f2e8d8','#d4bf9e'],['#c9a77c','#ddc3a0','#b08c5f'],['#cdd8e0','#e3eaef','#b7c6d1'],['#cfd8c8','#e4eadf','#bcc8b3']],wood:[2,3]},
- {k:'season',l:'Jahreszeiten',kind:'multi',tone:'mid',season:true,names:['Frühling','Sommer','Herbst','Winter'],cols:[['#5fae52','#f2a7c3','#8fcf6e'],['#f0a000','#2fb3e0','#f5c542'],['#b54c18','#e09a35','#7a3b16'],['#5f8fb8','#dce8f2','#3f6a93']]}
+ {k:'logo',l:'Logo',kind:'logo',tone:'dark',names:['Schiefer','Schwarz-Gold','Rot-Gold','Blau-Silber','Grün-Gold','Weinrot-Creme','Türkis-Gold','Violett-Silber','Kupfer','Mitternacht','Waldgrün','Sand-Braun'],
+  cols:[['#3c4854','#e8eef3','#222a33'],['#15161a','#d9b24a','#07080a'],['#5a1020','#e0b84a','#2d0710'],['#17304f','#cfd8e2','#0b1a2e'],['#123326','#cbb26a','#081a13'],['#4a1222','#f0e2cc','#280a12'],['#0d4a4a','#e3c178','#042a2a'],['#2e1a4a','#d6d9e0','#180d28'],['#4a2a16','#e8a86a','#2a160b'],['#0a1020','#8fa8d8','#050812'],['#143a1e','#9bd08a','#081f10'],['#4a3a26','#e0cba8','#281e14']]},
+ {k:'eigen',l:'Eigene Farben',kind:'multi',tone:'mid',eigen:true,cols:[['#4b5a6a','#8fa3b8','#27313c']]}
 ];
 var BGST={}; BGSTYLES.forEach(function(x){ BGST[x.k]=x; });
+function eigenCols(){ var v=(lsGet('bgeig')||'').split(','); var ok=v.length===3&&v.every(function(c){ return /^#[0-9a-f]{6}$/i.test(c); }); return ok?[v]:[['#4b5a6a','#8fa3b8','#27313c']]; }
+function sCols(st){ return st&&st.eigen?eigenCols():(st?st.cols:[]); }
+var LOGOMARK='<path d="M63 186A205 205 0 0 1 413 124" stroke="@I@" stroke-width="10.0" fill="none" stroke-linecap="round" opacity="0.55"/><path d="M420 316A175 175 0 0 1 122 368" stroke="@I@" stroke-width="8.5" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M205 397A150 150 0 0 1 160 141" stroke="@I@" stroke-width="7.0" fill="none" stroke-linecap="round" opacity="0.35"/><path d="M289 69A190 190 0 0 1 421 351" stroke="@I@" stroke-width="5.5" fill="none" stroke-linecap="round" opacity="0.3"/><g opacity="0.95"><g transform="translate(395 140) rotate(-20) scale(1.25)"><rect x="-28" y="-26" width="56" height="54" rx="9" fill="none" stroke="@I@" stroke-width="6"/><path d="M-28 -10H28M-14 -34V-20M14 -34V-20" stroke="@I@" stroke-width="6" stroke-linecap="round"/><circle cx="-10" cy="8" r="4" fill="@I@"/><circle cx="8" cy="8" r="4" fill="@I@"/></g></g><g opacity="0.95"><g transform="translate(118 150) rotate(25) scale(1.05)"><circle r="30" fill="none" stroke="@I@" stroke-width="6"/><path d="M0 0V-17M0 0L12 8" stroke="@I@" stroke-width="6" stroke-linecap="round"/></g></g><g opacity="0.85"><g transform="translate(112 380) rotate(15) scale(0.9)"><rect x="-28" y="-26" width="56" height="54" rx="9" fill="none" stroke="@I@" stroke-width="6"/><path d="M-28 -10H28M-14 -34V-20M14 -34V-20" stroke="@I@" stroke-width="6" stroke-linecap="round"/><circle cx="-10" cy="8" r="4" fill="@I@"/><circle cx="8" cy="8" r="4" fill="@I@"/></g></g><g opacity="0.95"><g transform="translate(388 385) rotate(-10) scale(1.15)"><circle r="30" fill="none" stroke="@I@" stroke-width="6"/><path d="M0 0V-17M0 0L12 8" stroke="@I@" stroke-width="6" stroke-linecap="round"/></g></g><g opacity="0.7"><g transform="translate(256 70) rotate(0) scale(0.7)"><circle r="30" fill="none" stroke="@I@" stroke-width="6"/><path d="M0 0V-17M0 0L12 8" stroke="@I@" stroke-width="6" stroke-linecap="round"/></g></g><g opacity="0.7"><g transform="translate(450 262) rotate(30) scale(0.65)"><rect x="-28" y="-26" width="56" height="54" rx="9" fill="none" stroke="@I@" stroke-width="6"/><path d="M-28 -10H28M-14 -34V-20M14 -34V-20" stroke="@I@" stroke-width="6" stroke-linecap="round"/><circle cx="-10" cy="8" r="4" fill="@I@"/><circle cx="8" cy="8" r="4" fill="@I@"/></g></g><g opacity="0.6"><g transform="translate(62 262) rotate(-15) scale(0.6)"><circle r="30" fill="none" stroke="@I@" stroke-width="6"/><path d="M0 0V-17M0 0L12 8" stroke="@I@" stroke-width="6" stroke-linecap="round"/></g></g><g opacity="0.7"><g transform="translate(256 452) rotate(-25) scale(0.7)"><rect x="-28" y="-26" width="56" height="54" rx="9" fill="none" stroke="@I@" stroke-width="6"/><path d="M-28 -10H28M-14 -34V-20M14 -34V-20" stroke="@I@" stroke-width="6" stroke-linecap="round"/><circle cx="-10" cy="8" r="4" fill="@I@"/><circle cx="8" cy="8" r="4" fill="@I@"/></g></g><g opacity="0.55"><g transform="translate(330 62) rotate(10) scale(0.5)"><circle r="30" fill="none" stroke="@I@" stroke-width="6"/><path d="M0 0V-17M0 0L12 8" stroke="@I@" stroke-width="6" stroke-linecap="round"/></g></g><g opacity="0.55"><g transform="translate(170 455) rotate(40) scale(0.5)"><rect x="-28" y="-26" width="56" height="54" rx="9" fill="none" stroke="@I@" stroke-width="6"/><path d="M-28 -10H28M-14 -34V-20M14 -34V-20" stroke="@I@" stroke-width="6" stroke-linecap="round"/><circle cx="-10" cy="8" r="4" fill="@I@"/><circle cx="8" cy="8" r="4" fill="@I@"/></g></g><g opacity="0.5"><g transform="translate(455 175) rotate(0) scale(0.45)"><circle r="30" fill="none" stroke="@I@" stroke-width="6"/><path d="M0 0V-17M0 0L12 8" stroke="@I@" stroke-width="6" stroke-linecap="round"/></g></g><g opacity="0.5"><g transform="translate(60 175) rotate(-30) scale(0.45)"><rect x="-28" y="-26" width="56" height="54" rx="9" fill="none" stroke="@I@" stroke-width="6"/><path d="M-28 -10H28M-14 -34V-20M14 -34V-20" stroke="@I@" stroke-width="6" stroke-linecap="round"/><circle cx="-10" cy="8" r="4" fill="@I@"/><circle cx="8" cy="8" r="4" fill="@I@"/></g></g><ellipse cx="256" cy="262" rx="118" ry="42" transform="rotate(-18 256 262)" fill="none" stroke="@I@" stroke-width="5" opacity=".85"/><text x="256" y="305" text-anchor="middle" font-family="FreeSerif" font-style="italic" font-size="160" fill="@I@">FP</text>';
+function logoBg(c){
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1700" preserveAspectRatio="xMidYMid slice">'
+    +'<defs><radialGradient id="g" cx=".5" cy=".46" r=".78"><stop offset="0" stop-color="'+c[0]+'"/><stop offset="1" stop-color="'+c[2]+'"/></radialGradient></defs>'
+    +'<rect width="1000" height="1700" fill="url(#g)"/>'
+    +'<g opacity="0.34" transform="translate(500 850) scale(1.35) translate(-256 -256)">'+LOGOMARK.split('@I@').join(c[1])+'</g></svg>';
+  return "url('data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg).replace(/'/g,'%27').replace(/"/g,'%22')+"')"; }
 function dkc(c,p){ return 'color-mix(in srgb,'+c+' '+p+'%,#0b0e13)'; }
-function bgTriple(st,i,dark){ var c=st.cols[i]; if(!c) return null; if(Array.isArray(c[0])) return c[dark?1:0]; if(!dark||st.tone==='dark') return c; var p=st.tone==='light'?32:55; return [dkc(c[0],p),dkc(c[1],p),dkc(c[2],p)]; }
-function seasonIdx(){ var m=new Date().getMonth(); return m>=2&&m<=4?0:m>=5&&m<=7?1:m>=8&&m<=10?2:3; }
+function bgTriple(st,i,dark){ var c=sCols(st)[i]; if(!c) return null; if(Array.isArray(c[0])) return c[dark?1:0]; if(!dark||st.tone==='dark') return c; var p=st.tone==='light'?32:55; return [dkc(c[0],p),dkc(c[1],p),dkc(c[2],p)]; }
 function bgImage(st,c,i){
+  if(st.kind==='logo') return logoBg(c);
   if(st.kind==='metal') return metal(c);
   if(st.kind==='neon') return 'radial-gradient(circle at 18% 12%,'+c[1]+' 0%,transparent 42%),radial-gradient(circle at 85% 78%,'+c[2]+' 0%,transparent 46%),radial-gradient(circle at 60% 40%,color-mix(in srgb,'+c[1]+' 35%,transparent) 0%,transparent 30%),linear-gradient('+c[0]+','+c[0]+')';
   if(st.kind==='edel') return 'linear-gradient(135deg,'+c[0]+' 0%,'+c[2]+' 36%,color-mix(in srgb,'+c[1]+' 70%,'+c[0]+') 50%,'+c[2]+' 64%,'+c[0]+' 100%)';
@@ -2516,7 +2552,7 @@ function bgTabChips(){ var L=BGTABS.concat((S.ctabs||[]).map(function(c){ return
   return '<div class="fld"><span class="lbl">Für welchen Reiter?</span><div class="chips">'+L.map(function(o){ var own=o[0]&&lsGet('bgm@'+o[0]); return '<button type="button" class="chip" data-a="bgtab" data-v="'+esc(o[0])+'" aria-pressed="'+(cur===o[0])+'">'+esc(o[1])+(own?' ●':'')+'</button>'; }).join('')+'</div>'
     +(cur?'<div class="chips"><button type="button" class="chip" data-a="bgsame" aria-pressed="'+(!lsGet('bgm@'+cur))+'">Wie „Alle Reiter“</button></div>':'')
     +'<p class="hint">Erst den Reiter wählen, dann Art und Farbe. „Alle Reiter“ gilt überall, wo nichts Eigenes eingestellt ist (● = eigener Stil). Gilt nur für dieses Gerät.</p></div>'; }
-function bgAccFor(t){ if(!t||lsGet('bgm@'+t)!=='col') return null; var st=BGST[lsGet('bgs@'+t)||'metal']||BGST.metal, v=lsGet('bgv@'+t), idx=(v==='a'&&st.season)?seasonIdx():(/^\d+$/.test(v||'')?+v:-1); if(idx<0) return null;
+function bgAccFor(t){ if(!t||lsGet('bgm@'+t)!=='col') return null; var st=BGST[lsGet('bgs@'+t)||'metal']||BGST.metal, v=lsGet('bgv@'+t), idx=(/^\d+$/.test(v||'')?+v:-1); if(idx<0) return null;
   var lc=bgTriple(st,idx,false), base, tx='#fff', sh='0 1px 1px rgba(0,0,0,.45)';
   if(st.tone==='dark'){ base=lc[1]; tx='#0d0d12'; sh='none'; } else if(st.tone==='light') base='color-mix(in srgb,'+lc[2]+' 58%,#0b0e13)'; else base='color-mix(in srgb,'+lc[0]+' 80%,#000)';
   var img;
@@ -2531,7 +2567,7 @@ function applyBg(){
   var b=document.body, r=document.documentElement; if(!b) return;
   var m=bgGet('bgm'), v=bgGet('bgv'), st=BGST[bgGet('bgs')||'metal']||BGST.metal, dark=(r.getAttribute('data-theme')==='dark')||(!r.getAttribute('data-theme')&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   ['--bg','--sheetbg','--wheelbg','--wheeltx','--wheelline','--acc','--acc-c','--acc-tx','--acc-sh','--btn-bg','--btn-line','--tabbar','--tabbg','--tabline','--acc-glow'].forEach(function(p){ r.style.removeProperty(p); }); b.classList.remove('hasbg'); b.classList.remove('bgdark'); b.classList.remove('acc'); b.classList.remove('flat'); b.style.backgroundImage='';
-  var idx=(v==='a'&&st.season)?seasonIdx():(/^\d+$/.test(v||'')?+v:-1);
+  var idx=/^\d+$/.test(v||'')?+v:-1;
   var mc=(m==='col'&&idx>-1)?bgTriple(st,idx,dark):null;
   if(mc){
     r.style.setProperty('--bg',mc[0]);
