@@ -621,6 +621,15 @@ var PEOPLE = ['papa','mama','kind1','kind2','p5','p6'];
 var PALETTE=['#1f6fe0','#e0237a','#12a35a','#f08a00','#7a3df0','#00a8c4','#e0302a','#a8641c','#5b6b80','#d4b000','#c026d3','#5aa800'];
 var PALETTE_OLD=['#3f7fd0','#d0457f','#2e9e6b','#e08a1e','#8a5cd6','#1fa3b3','#d6453d','#8a6a3a','#6b7a8f','#b89b00','#e0589a','#4f9a2e'];
 function applyPeopleColors(){ var st=document.documentElement.style; PEOPLE.forEach(function(k){ var c=S.people[k]&&S.people[k].color; if(c) st.setProperty('--p-'+k,c); else st.removeProperty('--p-'+k); }); }
+var REMMODE=[['notify','🔔 Benachrichtigung'],['alarm','⏰ Wecker'],['both','🔔 + ⏰ Beides'],['none','Nichts']];
+function remClean(x){ if(!x||typeof x!=='object') return undefined; var ok=function(v){ return ['notify','alarm','both','none'].indexOf(v)>-1?v:'notify'; }; return {own:ok(x.own),all:ok(x.all),oth:!!x.oth}; }
+function remPref(k){ var r=(S.people&&S.people[k]&&S.people[k].rem)||{}; return {own:r.own||'notify',all:r.all||'notify',oth:!!r.oth}; }
+function evAlarmBy(ev){ if(Array.isArray(ev.alarmBy)) return ev.alarmBy; return ev.alarm&&ev.by?[ev.by]:[]; }
+function isGenName(k){ var n=S.people&&S.people[k]&&S.people[k].name; return !!n&&/^\s*(allgemein|alle|familie)\s*$/i.test(n); }
+function evGeneral(ev){ var who=ev.who||[], act=PEOPLE.filter(function(k){ return S.people[k]&&S.people[k].active&&!isGenName(k); }); if(!who.length) return true; if(who.some(isGenName)) return true; return act.length>1&&act.every(function(k){ return who.indexOf(k)>-1; }); }
+function evRemFor(ev,k){ var p=remPref(k), who=ev.who||[], m=evGeneral(ev)?p.all:who.indexOf(k)>-1?p.own:(p.oth?'notify':'none');
+  return {n:m==='notify'||m==='both',a:m==='alarm'||m==='both'||evAlarmBy(ev).indexOf(k)>-1}; }
+function evTo(ev){ var n=[], a=[]; PEOPLE.forEach(function(k){ if(!S.people[k]||!S.people[k].active||isGenName(k)) return; var r=evRemFor(ev,k); if(r.a) a.push(k); else if(r.n) n.push(k); }); return {n:n,a:a}; }
 function hasShAlarm(k){ var p=S.people&&S.people[k]; if(p&&p.shalarm!==undefined) return !!p.shalarm; return k==='papa'||k==='mama'; }
 function savePeople(){ var o={list:PEOPLE.slice()}; PEOPLE.forEach(function(k){ o[k]=S.people[k]; }); return saveSettings('people',o); }
 var BINS = [
@@ -667,11 +676,11 @@ function applySettings(rows){
     if(lst&&lst.length){
       var nd={};
       lst.forEach(function(k){ var v=r[k], dv=d[k]||{name:'Person',active:true};
-        nd[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):dv.name,active:v.active!==undefined?!!v.active:dv.active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined}; });
+        nd[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):dv.name,active:v.active!==undefined?!!v.active:dv.active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined,rem:remClean(v.rem)}; });
       d=nd; PEOPLE.length=0; lst.forEach(function(k){ PEOPLE.push(k); });
     } else {
       PEOPLE.length=0; Object.keys(d).forEach(function(k){ PEOPLE.push(k); });
-      PEOPLE.forEach(function(k){ var v=r[k]; if(v&&typeof v==='object'){ d[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):d[k].name,active:v.active!==undefined?!!v.active:d[k].active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined}; } });
+      PEOPLE.forEach(function(k){ var v=r[k]; if(v&&typeof v==='object'){ d[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):d[k].name,active:v.active!==undefined?!!v.active:d[k].active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined,rem:remClean(v.rem)}; } });
     }
   }
   S.people=d; if(S.me&&PEOPLE.indexOf(S.me)<0) S.me=null; applyPeopleColors();
@@ -1293,7 +1302,7 @@ function formFromEvent(ev){
   return f;
 }
 function formFromEvent0(ev){
-  return {id:ev.id,title:ev.title||'',cat:ev.cat||'sonst',catManual:true,who:(ev.who||[]).slice(),date:ev.date,endDate:ev.endDate||'',start:ev.start||'',end:ev.end||'',recur:ev.recur||'none',until:ev.until||'',remind:ev.remind||'',vis:ev.vis||'',visSet:!!ev.vis,remAt:ev.remAt||'',remDays:ev.remDays||0,alarm:!!ev.alarm,skip:(ev.skip||[]).slice(),lessons:Array.isArray(ev.lessons)?ev.lessons.map(function(l){ return {start:l.start||'',end:l.end||'',subject:l.subject||'',room:l.room||''}; }):null,occ:S.sel,quick:'',hint:'',hintKind:'',busy:false,del:'',msg:'',msgKind:''};
+  return {id:ev.id,title:ev.title||'',cat:ev.cat||'sonst',catManual:true,who:(ev.who||[]).slice(),date:ev.date,endDate:ev.endDate||'',start:ev.start||'',end:ev.end||'',recur:ev.recur||'none',until:ev.until||'',remind:ev.remind||'',vis:ev.vis||'',visSet:!!ev.vis,remAt:ev.remAt||'',remDays:ev.remDays||0,alarm:!!S.me&&evAlarmBy(ev).indexOf(S.me)>-1,alarmBy:evAlarmBy(ev).slice(),skip:(ev.skip||[]).slice(),lessons:Array.isArray(ev.lessons)?ev.lessons.map(function(l){ return {start:l.start||'',end:l.end||'',subject:l.subject||'',room:l.room||''}; }):null,occ:S.sel,quick:'',hint:'',hintKind:'',busy:false,del:'',msg:'',msgKind:''};
 }
 function applyCatDefaults(prevK,k){
   var f=S.form, prev=CAT[prevK], c=CAT[k];
@@ -1864,8 +1873,8 @@ function eventSheetHTML(){
     +(c.all?'':'<div class="fld"><span class="lbl">Im Monat sichtbar für</span><div class="seg segtop" role="group"><button type="button" data-a="evvis" data-v="all" aria-pressed="'+(formVis(f)==='all')+'">Alle</button><button type="button" data-a="evvis" data-v="own" aria-pressed="'+(formVis(f)!=='all')+'">Nur '+esc((f.who||[]).map(pname).join(', ')||'ausgewählte Personen')+'</button></div><p class="hint">'+(formVis(f)==='all'?'Steht für alle immer in der Monatsübersicht, z. B. Familienurlaub.':'Steht in der Monatsübersicht nur, wenn die Person oben angetippt ist. Beim Antippen des Tages sieht man ihn immer.')+'</p></div>')
     +'<div class="fld"><label class="lbl" for="f-remind">Erinnerung</label><select id="f-remind" data-f="remind">'+opt(REMIND,f.remind)+'</select>'
       +(f.remind==='custom'?'<div class="brem"><select data-f="remDays" aria-label="Wann" style="width:auto">'+opt(REMDAYS,String(f.remDays||0))+'</select><div class="btw">'+timeSelects('remAt',f.remAt||'08:00',true)+'<span>Uhr</span></div></div>':'')
-      +(f.remind?'<label class="cb" style="display:flex;gap:10px;align-items:center"><input type="checkbox" data-f2="alarm"'+(f.alarm?' checked':'')+' style="width:22px;height:22px">⏰ Als Wecker klingeln</label>':'')
-      +'<p class="hint">'+(f.remind?'Erscheint oben im Kalender. Klingeln geht, solange die App offen ist.':'Wird oben im Kalender angezeigt, sobald jemand die Seite öffnet.')+'</p></div>'
+      +(f.remind?'<label class="cb" style="display:flex;gap:10px;align-items:center"><input type="checkbox" data-f2="alarm"'+(f.alarm?' checked':'')+(S.me?'':' disabled')+' style="width:22px;height:22px">⏰ Bei mir als Wecker klingeln</label>':'')
+      +'<p class="hint">'+(f.remind?'Gilt nur für dich. Wie die anderen erinnert werden, stellt jeder selbst im Menü unter „Erinnerungen & Wecker“ ein.'+(S.me?'':' Für den Wecker zuerst im Menü unter „Ich bin“ auswählen, wer du bist.'):'Wird oben im Kalender angezeigt, sobald jemand die Seite öffnet.')+'</p></div>'
     +lastChangeHTML()
     +(f.msg?'<p class="hint '+esc(f.msgKind)+'" role="alert">'+esc(f.msg)+'</p>':'')
     +buttons;
@@ -1882,8 +1891,16 @@ function menuSummary(k){ var m=menuStyleVars();
   if(k==='ichbin') return S.me?pname(S.me):'nicht gewählt';
   if(k==='familie') return activePeople().length+' aktiv';
   return ''; }
+function remPrefHTML(){ var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">🙋 So werde ich erinnert</b>';
+  if(!S.me||isGenName(S.me)) return h+'<p class="hint">Bitte zuerst unter Menü → „Ich bin“ auswählen, wer dieses Handy benutzt. Jede Person stellt das hier für sich selbst ein.</p></div>';
+  var p=remPref(S.me), sel=function(key,v){ return '<select data-rem="'+key+'" style="width:auto">'+REMMODE.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; };
+  return h+'<p class="hint">Gilt nur für <span style="font-weight:700;color:var(--p-'+S.me+')">'+esc(pname(S.me))+'</span>. Die anderen stellen das auf ihrem Handy selbst ein.</p>'
+   +'<div class="tabrow" style="gap:8px"><span style="min-width:0">Meine Termine</span>'+sel('own',p.own)+'</div>'
+   +'<div class="tabrow" style="gap:8px"><span style="min-width:0">Termine für „Allgemein“</span>'+sel('all',p.all)+'</div>'
+   +'<label class="cb" style="display:flex;gap:10px;align-items:center;margin-top:6px"><input type="checkbox" data-rem="oth"'+(p.oth?' checked':'')+' style="width:22px;height:22px">Auch bei Terminen der anderen benachrichtigen</label>'
+   +'<p class="hint">Erinnert wird nur bei Terminen, bei denen eine Erinnerung eingestellt ist. Der Haken „Bei mir als Wecker klingeln“ am Termin gilt immer nur für die Person, die ihn setzt.</p></div>'; }
 function weckerHTML(){ var act=activePeople().filter(hasShAlarm), A=S.alarms||{}, codes=[['F','Frühschicht'],['S','Spätschicht'],['N','Nachtschicht'],['TD','Tagdienst']];
-  return '<p class="hint">Erinnerungen stellst du direkt am Eintrag ein: bei jedem Termin unter „Erinnerung“ (auch eigene Zeit und „Als Wecker klingeln“), bei Geburtstagen im Adressbuch und bei den Tonnen. Hier stellst du die Wecker für Schichten ein.</p>'
+  return remPrefHTML()+'<p class="hint">Die Erinnerungszeit stellst du direkt am Eintrag ein: bei jedem Termin unter „Erinnerung“ (auch eigene Zeit und „Bei mir als Wecker klingeln“), bei Geburtstagen im Adressbuch und bei den Tonnen. Hier stellst du die Wecker für Schichten ein.</p>'
    +'<div class="panel" style="margin:0"><b class="bpt">Wecker für Schichten</b><p class="hint">Klingelt in der App auf dem Handy der jeweiligen Person (Menü → „Ich bin“). Bei geschlossener App kommt eine Benachrichtigung (oben einschalten). Mit 📱 stellst du die Zeit zusätzlich einmal im Handy-Wecker.</p>'
    +(act.length?'':'<p class="hint">Niemand hat den Schicht-Wecker eingeschaltet. Das geht unter Menü → Familie und Weitere (⏰).</p>')+act.map(function(k){ return '<div class="fld"><span class="lbl" style="color:var(--p-'+k+')">'+esc(pname(k))+'</span>'+codes.map(function(c){ var a=(A[k]||{})[c[0]]||{}, ed=S.alEdit===k+'|'+c[0];
       return '<div class="tabrow" style="gap:8px"><span style="min-width:0">'+c[1]+'</span>'+(ed?'<div class="btw">'+timeSelects('al:'+k+':'+c[0],a.t||'05:00',true)+'<span>Uhr</span></div><button type="button" class="btn sm pri" data-a="aledit" data-v="">Fertig</button>'
@@ -2000,7 +2017,7 @@ function saveEvent(){
   if(!c.all&&!f.who.length) return formMsg('Bitte mindestens eine Person wählen.');
   if(f.remind==='hour'&&!f.start) return formMsg('Für „1 Stunde vorher“ brauchst du eine Startzeit.');
   var rec=f.recur!=='none';
-  var obj={title:(f.title||'').trim()||c.l,cat:f.cat,who:c.all?[]:f.who,date:f.date,endDate:(!rec&&f.endDate&&f.endDate>f.date)?f.endDate:'',start:f.start||'',end:f.end||'',recur:f.recur||'none',until:rec?(f.until||''):'',remind:f.remind||'',skip:f.skip||[],vis:c.all?'all':formVis(f),remAt:f.remind==='custom'?(f.remAt||'08:00'):'',remDays:f.remind==='custom'?(+f.remDays||0):0,alarm:!!(f.remind&&f.alarm),by:S.me||'',ts:Date.now()};
+  var obj={title:(f.title||'').trim()||c.l,cat:f.cat,who:c.all?[]:f.who,date:f.date,endDate:(!rec&&f.endDate&&f.endDate>f.date)?f.endDate:'',start:f.start||'',end:f.end||'',recur:f.recur||'none',until:rec?(f.until||''):'',remind:f.remind||'',skip:f.skip||[],vis:c.all?'all':formVis(f),remAt:f.remind==='custom'?(f.remAt||'08:00'):'',remDays:f.remind==='custom'?(+f.remDays||0):0,alarm:false,alarmBy:(function(){ var ab=(f.alarmBy||[]).filter(function(x){ return x!==S.me; }); if(f.remind&&f.alarm&&S.me) ab.push(S.me); return ab; })(),by:S.me||'',ts:Date.now()};
   if(Array.isArray(f.lessons)){ var tl=tidyLessons(f.lessons); obj.lessons=tl; if(tl.length){ obj.start=tl[0].start; obj.end=tl[tl.length-1].end||tl[tl.length-1].start; if(/^Schule: /.test(obj.title)) obj.title=lessonTitle(tl); } }
   if(f.series&&f.scope==='one'&&f.id){ obj.recur='none'; obj.until=''; obj.skip=[]; var nid=S.store.newId(), sk=(f.skip||[]).concat([f.occ]);
     return safe(function(){ return S.store.update('events',f.id,{skip:sk}); }).then(function(ok){ if(!ok) return false; return safe(function(){ return S.store.set('events',nid,obj); }); }).then(function(ok){ if(ok) closeSheet(); }); }
@@ -2383,6 +2400,7 @@ document.addEventListener('change',function(e){
   if(e.target&&e.target.classList&&e.target.classList.contains('impfile')){ var fi=e.target.files&&e.target.files[0]; e.target.value=''; if(!fi) return; var rd=new FileReader(); rd.onload=function(){ var dat; try{ dat=JSON.parse(rd.result); }catch(x){ toast('Das ist keine gültige Umzugs-Datei.'); return; } S.importing=true; var n=0; ['events','settings','shifts','notes','shop','contacts','chats','citems'].forEach(function(c){ if(dat[c]&&typeof dat[c]==='object') Object.keys(dat[c]).forEach(function(id){ n++; S.store.set(c,id,dat[c][id]); }); }); saveSettings('migrated',{ts:Date.now(),n:n}); lsSet('seen_all',String(Date.now())); setTimeout(function(){ S.importing=false; updChatBadge(); },2500); toast(n+' Einträge aus der Claude-Version übernommen.'); closeSheet(); }; rd.readAsText(fi); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.scal){ var m=JSON.parse(JSON.stringify(S.schoolCal||{})); m[e.target.dataset.scal]=!!e.target.checked; S.schoolCal=m; saveSettings('schoolcal',{m:m}); renderCal(); renderSchool(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.alon){ var aq=e.target.dataset.alon.split('|'), A2=JSON.parse(JSON.stringify(S.alarms||{})); A2[aq[0]]=A2[aq[0]]||{}; var cur=A2[aq[0]][aq[1]]||{t:'05:00'}; cur.on=!!e.target.checked; cur.t=cur.t||'05:00'; A2[aq[0]][aq[1]]=cur; S.alarms=A2; saveSettings('alarms',{p:A2}); renderSheet(); return; }
+  if(e.target&&e.target.dataset&&e.target.dataset.rem&&S.me&&S.people[S.me]){ var rk=e.target.dataset.rem, rp=remPref(S.me); if(rk==='oth') rp.oth=!!e.target.checked; else rp[rk]=e.target.value; S.people[S.me].rem=remClean(rp); savePeople(); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.f2&&S.form){ S.form[e.target.dataset.f2]=!!e.target.checked; return; }
   if(e.target&&e.target.classList&&e.target.classList.contains('listscan')){ var lf=e.target.files&&e.target.files[0], lc=ctab(); e.target.value=''; if(lf&&lc&&S.sample) listScan(lf,lc); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.tabshow){ var th=tabHidden(), tk=e.target.dataset.tabshow, ti=th.indexOf(tk); if(e.target.checked&&ti>-1) th.splice(ti,1); if(!e.target.checked&&ti<0) th.push(tk); lsSet('tabhide',JSON.stringify(th)); if(tk==='muell'||tk==='school'){ renderCal(); renderSchool(); } renderTabs(); return; }
@@ -2652,12 +2670,13 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 function pushPlan(){ var out=[], t0=ymd(new Date()), codes={F:'Frühschicht',S:'Spätschicht',N:'Nachtschicht',TD:'Tagdienst'};
   var atMs=function(d,h){ h=/^\d{2}:\d{2}$/.test(h||'')?h:'00:00'; return new Date(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10),+h.slice(0,2),+h.slice(3,5)).getTime(); };
   var add=function(k,d,h,title,body,to,al){ out.push({k:k,at:atMs(d,h),t:String(title||'').slice(0,80),b:String(body||'').slice(0,120),to:(to||[]).slice(),al:!!al}); };
+  var evAdd=function(ev,k,d,h,title,body){ var g=evTo(ev); if(g.n.length) add(k,d,h,title,body,g.n,false); if(g.a.length) add(k+'_a',d,h,title,body,g.a,true); };
   for(var i=0;i<14;i++){ (function(t){ var tm=addDays(t,1);
-    (S.events||[]).forEach(function(ev){ if(!ev.remind) return; var nm=ev.title||(CAT[ev.cat]||CAT.sonst).l, to=ev.who||[], al=!!ev.alarm, st=ev.start?' um '+ev.start:'';
-      if(ev.remind==='eve'&&occursOn(ev,tm)) add('ev_'+ev.id+'_'+tm,t,'18:00',nm,'Morgen'+st,to,al);
-      if(ev.remind==='morning'&&occursOn(ev,t)) add('ev_'+ev.id+'_'+t,t,'07:00',nm,'Heute'+st,to,al);
-      if(ev.remind==='hour'&&ev.start&&occursOn(ev,t)){ var mm=(+ev.start.slice(0,2))*60+(+ev.start.slice(3))-60; if(mm>=0) add('ev_'+ev.id+'_'+t,t,pad(Math.floor(mm/60))+':'+pad(mm%60),nm,'In 1 Stunde, um '+ev.start,to,al); }
-      if(ev.remind==='custom'){ var od=addDays(t,+ev.remDays||0); if(occursOn(ev,od)) add('ev_'+ev.id+'_'+od,t,ev.remAt||'08:00',nm,(+ev.remDays?WD[weekday(od)]+', '+dmy(od):'Heute')+st,to,al); } });
+    (S.events||[]).forEach(function(ev){ if(!ev.remind) return; var nm=ev.title||(CAT[ev.cat]||CAT.sonst).l, st=ev.start?' um '+ev.start:'';
+      if(ev.remind==='eve'&&occursOn(ev,tm)) evAdd(ev,'ev_'+ev.id+'_'+tm,t,'18:00',nm,'Morgen'+st);
+      if(ev.remind==='morning'&&occursOn(ev,t)) evAdd(ev,'ev_'+ev.id+'_'+t,t,'07:00',nm,'Heute'+st);
+      if(ev.remind==='hour'&&ev.start&&occursOn(ev,t)){ var mm=(+ev.start.slice(0,2))*60+(+ev.start.slice(3))-60; if(mm>=0) evAdd(ev,'ev_'+ev.id+'_'+t,t,pad(Math.floor(mm/60))+':'+pad(mm%60),nm,'In 1 Stunde, um '+ev.start); }
+      if(ev.remind==='custom'){ var od=addDays(t,+ev.remDays||0); if(occursOn(ev,od)) evAdd(ev,'ev_'+ev.id+'_'+od,t,ev.remAt||'08:00',nm,(+ev.remDays?WD[weekday(od)]+', '+dmy(od):'Heute')+st); } });
     BINS.forEach(function(b){ var c=S.muell&&S.muell[b.k]; if(c&&c.remind&&binDue(c,tm)) add('bin_'+b.k+'_'+tm,t,binTime(b.k),b.l+' rausstellen','Abholung morgen',[],!!c.alarm); });
     (S.contacts||[]).forEach(function(c){ if(!c.bday||!c.remind||!c.name) return; var lim={day:0,d1:1,d3:3,d7:7}[c.remind]; if(lim===undefined) return; var nb=addDays(t,lim); if(bdayNext(c,t)!==nb) return; add('bd_'+c.id+'_'+nb,t,c.remAt||'09:00','🎂 '+c.name,lim?'Geburtstag am '+dmy(nb):'Hat heute Geburtstag',PEOPLE.indexOf(c.owner)>-1?[c.owner]:[],!!c.alarm); });
     PEOPLE.forEach(function(k){ var A=(S.alarms||{})[k]; if(!A||!hasShAlarm(k)) return; var sc=shiftOn(k,t)[0], a=sc&&A[sc]; if(a&&a.on){ var ta=shiftTimes(k,t).a; add('sh_'+k+'_'+t+'_'+sc,t,a.t||'05:00','⏰ '+(codes[sc]||sc),'Heute'+(ta?' ab '+ta:''),[k],true); } });
@@ -2706,7 +2725,7 @@ function pcl(n,l){ return S.pconf===n?'Wirklich? Nochmal tippen':l; }
 function saCopy(){ var tx=S.saText||''; var fb=function(){ var ta=$('#saOut'); if(ta){ ta.focus(); ta.select(); try{ document.execCommand('copy'); toast('Kopiert. Jetzt bei GitHub einfügen.'); }catch(e){ toast('Bitte den Text lange antippen und kopieren.'); } } };
   try{ navigator.clipboard.writeText(tx).then(function(){ toast('Kopiert. Jetzt bei GitHub einfügen.'); },fb); }catch(e){ fb(); } }
 function alarmsDue(){ var t=ymd(new Date()), tm=addDays(t,1), out=[], hm=function(x){ return x||'00:00'; };
-  S.events.forEach(function(ev){ if(!ev.alarm||!ev.remind) return; var nm=ev.title||(CAT[ev.cat]||CAT.sonst).l;
+  S.events.forEach(function(ev){ if(!ev.remind||!S.me||!evRemFor(ev,S.me).a) return; var nm=ev.title||(CAT[ev.cat]||CAT.sonst).l;
     if(ev.remind==='eve'&&occursOn(ev,tm)) out.push({key:'ev_'+ev.id+'_'+tm,at:'18:00',title:nm,sub:'Morgen'+(ev.start?' um '+ev.start:'')});
     if(ev.remind==='morning'&&occursOn(ev,t)) out.push({key:'ev_'+ev.id+'_'+t,at:'07:00',title:nm,sub:'Heute'+(ev.start?' um '+ev.start:'')});
     if(ev.remind==='hour'&&ev.start&&occursOn(ev,t)){ var mm=(+ev.start.slice(0,2))*60+(+ev.start.slice(3))-60; if(mm>=0) out.push({key:'ev_'+ev.id+'_'+t,at:pad(Math.floor(mm/60))+':'+pad(mm%60),title:nm,sub:'In 1 Stunde, um '+ev.start}); }
