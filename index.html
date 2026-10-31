@@ -1219,7 +1219,7 @@ function renderNotes(){
       return '<button type="button" class="chi" data-a="chatopen" data-id="'+esc(x.c.id)+'">'+avHTML(x.c)+'<span class="cb2"><b>'+esc(chatName(x.c))+'</b><small>'+(l?esc((PEOPLE.indexOf(l.by)>-1?pname(l.by):'Jemand')+': '+String(l.text||'')):(x.c.fam?'Alle in der Familie':'Noch keine Nachrichten'))+'</small></span>'+(u?'<span class="un">'+u+'</span>':'')+'</button>'; }).join('')+'</div>'
       +'<p class="hint" style="margin-top:12px">Jeder sieht hier nur die Chats, in denen er dabei ist. Ohne Anmeldung ist das noch kein echter Schutz.</p>';
     updChatBadge(); return; }
-  var c=chatById(S.chatOpen), M=chatMsgs(c.id).slice(-200), lastDay='', keep=$('#chatText'), draft=keep?keep.value:(S.chatDraft||''), om=box.querySelector('.chm'), atEnd=!om||box.dataset.cid!==c.id||(om.scrollHeight-om.scrollTop-om.clientHeight<90), oTop=om?om.scrollTop:0; box.dataset.cid=c.id;
+  var c=chatById(S.chatOpen), M=chatMsgs(c.id).slice(-200), lastDay='', keep=$('#chatText'), draft=keep?keep.value:(S.chatDraft||''), om=box.querySelector('.chm'), atEnd=!om||box.dataset.cid!==c.id||(om.scrollHeight-om.scrollTop-om.clientHeight<90), oTop=om?om.scrollTop:0, oldChin=(box.dataset.cid===c.id)?box.querySelector('.chin'):null; box.dataset.cid=c.id;
   var mem=c.fam?'Alle in der Familie':c.members.map(pname).join(', ');
   box.innerHTML='<div class="chh"><button type="button" class="icon-btn" data-a="chatback" aria-label="Zurück">'+ic('chevL')+'</button>'+avHTML(c)+'<b>'+esc(chatName(c))+'<small>'+esc(mem)+'</small></b>'
     +(!c.fam&&(c.by===S.me||!S.me)?'<button type="button" class="btn danger sm" data-a="chatdel">'+(S.chatDel?'Wirklich?':'Löschen')+'</button>':'')+'<button type="button" class="icon-btn chx" data-a="chatx" aria-label="Chat verlassen">'+ic('x')+'</button></div>'
@@ -1229,6 +1229,7 @@ function renderNotes(){
       return h+'<div class="bub'+(n.by&&n.by===S.me?' mine':'')+'"'+(k?' style="--pc:var(--p-'+k+')"':'')+'><div class="bh"><b>'+esc(k?pname(k):'Jemand')+'</b><span>'+(tm?pad(tm.getHours())+':'+pad(tm.getMinutes()):'')+'</span>'+(n.by&&n.by===S.me?'<button class="x" data-a="delnote" data-id="'+esc(n.id)+'" aria-label="Nachricht löschen">'+ic('x',14)+'</button>':'')+'</div><p>'+esc(n.text)+'</p>'+(n.by&&n.by===S.me&&n.ts?rcptHTML(c,n):'')+'</div>';
     }).join(''):'<div class="empty">'+(S.loaded.notes?'Noch keine Nachrichten. Schreib die erste!':'Lädt …')+'</div>')+'</div>'
     +'<div class="chin"><textarea id="chatText" rows="1" maxlength="500" placeholder="Nachricht …">'+esc(draft)+'</textarea><button type="button" class="btn pri" data-a="chatsend">Senden</button></div>';
+  if(oldChin){ var nChin=box.querySelector('.chin'); if(nChin) nChin.replaceWith(oldChin); }
   if(S.tab==='notes'){ var nowTs=Math.max(Date.now(),(M[M.length-1]||{}).ts||0); lsSet('seen_'+c.id,String(nowTs)); if(M.length&&!document.hidden) rcptSave({cid:c.id,rd:(M[M.length-1]||{}).ts||0}); }
   updChatBadge();
   fitChat(atEnd?'end':oTop);
