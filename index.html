@@ -1187,7 +1187,10 @@ function rcptSave(ch){ if(!S.me||!S.store) return; var sv=rcpt(S.me)||{}, mi=S.r
 function rcptHTML(c,n){ var to=(c.fam?activePeople():(c.members||[])).filter(function(k){ return k!==S.me&&!isGenName(k)&&PEOPLE.indexOf(k)>-1; }); if(!to.length) return '';
   var rd=to.filter(function(k){ var r=rcpt(k); return ((r.rd||{})[c.id]||0)>=n.ts; }), dl=to.every(function(k){ return rd.indexOf(k)>-1||(rcpt(k).rcv||0)>=n.ts; });
   var ackOn=to.some(function(k){ return !!rcpt(k).ack; }), late=ackOn&&!dl&&Date.now()-n.ts>10000; if(!dl&&!late){ clearTimeout(S.rcptRT); S.rcptRT=setTimeout(function(){ if(S.tab==='notes'&&S.chatOpen) renderNotes(); },Math.max(500,10500-(Date.now()-n.ts))); }
-  return '<div class="rcpt" title="'+esc((dl?'Angekommen':late?'Noch nicht angekommen':'Gesendet')+(rd.length?' · gelesen von '+rd.map(pname).join(', '):''))+'"><span class="dots'+(late?' late':'')+'"><b></b>'+(dl?'<b></b>':'')+'</span>'+rd.map(function(k){ return '<i style="--pc:var(--p-'+k+')">'+esc(pname(k).slice(0,1).toUpperCase())+'</i>'; }).join('')+'</div>'; }
+  var miss=to.filter(function(k){ return rd.indexOf(k)<0&&!((rcpt(k).rcv||0)>=n.ts); }), open=!dl&&S.rcptWho===n.id&&miss.length;
+  var dots='<span class="dots'+(late?' late':'')+'"><b></b>'+(dl?'<b></b>':'')+'</span>';
+  if(!dl&&to.length>1) dots='<button type="button" class="dotbtn" data-a="rcptwho" data-id="'+esc(n.id)+'" aria-label="Wer hat die Nachricht noch nicht bekommen?" style="all:unset;cursor:pointer">'+dots+'</button>';
+  return '<div class="rcpt" title="'+esc((dl?'Angekommen':late?'Noch nicht angekommen':'Gesendet')+(rd.length?' · gelesen von '+rd.map(pname).join(', '):''))+'">'+dots+rd.map(function(k){ return '<i style="--pc:var(--p-'+k+')">'+esc(pname(k).slice(0,1).toUpperCase())+'</i>'; }).join('')+(open?'<small style="width:100%;font-size:12px;color:var(--ink-2)">Noch nicht angekommen: '+miss.map(pname).map(esc).join(', ')+'</small>':'')+'</div>'; }
 function chatSeen(id){ return +(lsGet('seen_'+id)||0); }
 function chatUnread(id){ var t=chatSeen(id); return chatMsgs(id).filter(function(n){ return (n.ts||0)>t&&n.by!==S.me; }).length; }
 function chatList(){ var L=[chatById('all')].concat((S.chats||[]).filter(function(c){ return chatVisible(c.id); }));
@@ -2433,6 +2436,7 @@ document.addEventListener('click',function(e){
     case 'chatsend': sendChat(); break;
     case 'chatdel': if(S.chatOpen&&S.chatOpen!=='all'){ if(!S.chatDel){ S.chatDel=true; renderNotes(); break; } var dcid=S.chatOpen; chatMsgs(dcid).forEach(function(n){ safe(function(){ return S.store.remove('notes',n.id); }); }); safe(function(){ return S.store.remove('chats',dcid); }); S.chatOpen=''; S.chatDel=false; renderNotes(); } break;
     case 'delnote': safe(function(){ return S.store.remove('notes',t.dataset.id); }); break;
+    case 'rcptwho': S.rcptWho=S.rcptWho===t.dataset.id?null:t.dataset.id; renderNotes(); break;
   }
 });
 document.addEventListener('input',function(e){
