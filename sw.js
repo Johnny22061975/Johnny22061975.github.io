@@ -1,5 +1,5 @@
 // Familien-Planer Service Worker: App offline startbar machen
-const C = 'fp-v5';
+const C = 'fp-v6';
 const CORE = ['./', './index.html', './config.js', './fb.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => Promise.all(CORE.map(u => c.add(u).catch(() => null)))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -22,13 +22,15 @@ self.addEventListener('push', e => {
   let j = {}; try { j = e.data ? e.data.json() : {}; } catch (x) { j = { data: { body: e.data ? e.data.text() : '' } }; }
   const d = j.data || (j.notification) || j;
   const al = d.kind === 'alarm';
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+  // Empfangsbestätigung für den Chat (zweiter grüner Punkt beim Absender)
+  const ack = (d.kind === 'chat' && d.mid && d.me && /^https:\/\/[^/]+\.workers\.dev$/.test(d.ack || '')) ? fetch(d.ack, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ ack: d.mid, me: d.me }) }).catch(() => null) : Promise.resolve();
+  e.waitUntil(ack.then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
     if (d.kind === 'chat' && cs.some(c => c.visibilityState === 'visible')) return;
     return self.registration.showNotification(d.title || 'Familien-Planer', {
       body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag, icon: 'icon-192.png', badge: 'icon-192.png',
       requireInteraction: al, vibrate: al ? [600, 200, 600, 200, 600, 200, 600, 200, 600] : [200, 100, 200], data: { url: './', chat: (d.kind === 'chat' && /^chat_/.test(d.tag || '')) ? String(d.tag).slice(5) : '' }
     });
-  }));
+  })));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
