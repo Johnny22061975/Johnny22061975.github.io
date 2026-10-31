@@ -1381,7 +1381,7 @@ function renderAll(){ renderTop(); renderNotice(); renderCal(); renderMuell(); r
 /* ---------- Termin-Formular ---------- */
 function defaultWho(){ return S.me?[S.me]:[activePeople()[0]]; }
 function blankForm(date){
-  return {id:'',title:'',cat:'sonst',catManual:false,who:defaultWho(),date:date,endDate:'',start:'',end:'',recur:'none',until:'',remind:'',skip:[],occ:date,quick:'',hint:'',hintKind:'',busy:false,del:'',msg:'',msgKind:''};
+  return {id:'',title:'',cat:'sonst',catManual:false,who:defaultWho(),date:date,endDate:'',start:'',end:'',recur:'none',until:'',remind:'',skip:[],vis:'all',visSet:true,occ:date,quick:'',hint:'',hintKind:'',busy:false,del:'',msg:'',msgKind:''};
 }
 function formFromEvent(ev){
   var f=formFromEvent0(ev);
