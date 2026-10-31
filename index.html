@@ -838,6 +838,9 @@ function renderNav(){ var nav=$('#nav'); if(!nav) return; var hid=tabHidden();
   nav.querySelectorAll('button[data-t]').forEach(function(x){ var t=x.dataset.t; x.classList.toggle('hidetab',t!=='cal'&&hid.indexOf(t)>-1); if(t===S.tab) x.setAttribute('aria-current','page'); else x.removeAttribute('aria-current'); });
   if(S.tab!=='cal'&&(hid.indexOf(S.tab)>-1||(/^c_/.test(S.tab)&&!(S.ctabs||[]).some(function(c){ return 'c_'+c.id===S.tab; })))){ S.tab='cal'; renderTabs(); }
   applyNav(); paintTabs(); }
+function ntTopics(c){ return (S.citems||[]).filter(function(x){ return x.tab===c.id&&(x.kind==='topic'||(x.kind==='note'&&x.id==='note_'+c.id&&(x.text||x.title))); }).sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); }
+function ntName(x){ return x.title||(x.kind==='note'?'Notiz':'Ohne Überschrift'); }
+function ntSave(ch){ var c=ctab(); if(!c||!S.ntopic) return; var id=S.ntopic.id, o=(S.citems||[]).filter(function(x){ return x.id===id; })[0]||{}; var d={tab:c.id,kind:o.kind||'topic',title:o.title||'',text:o.text||'',by:S.me||'',ts:Date.now()}; Object.keys(ch).forEach(function(k){ d[k]=ch[k]; }); safe(function(){ return S.store.set('citems',id,d); }); }
 function ctab(){ var id=String(S.tab||'').slice(2); return (S.ctabs||[]).filter(function(c){ return c.id===id; })[0]||null; }
 function listScan(file,c){ S.lscan='Bitte warten, Liste wird gelesen …'; renderCustom();
   var fr=new FileReader(); fr.onload=function(){ var im=new Image(); im.onload=function(){ var k=Math.min(1,1600/Math.max(im.width,im.height)), cv=document.createElement('canvas'); cv.width=Math.round(im.width*k); cv.height=Math.round(im.height*k); cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
@@ -851,8 +854,18 @@ function renderCustom(){ var box=$('#customBox'), c=ctab(); if(!box||!c) return;
     h+=(S.sample?'<div class="btns" style="margin-bottom:8px"><label class="btn sm filebtn">'+ic('camera',16)+' Liste per Foto<input type="file" class="listscan" accept="image/*"></label>'+(S.lscan?'<span class="hint">'+esc(S.lscan)+'</span>':'')+(L.some(function(x){ return x.done; })?'<button type="button" class="btn sm" data-a="citclear">Erledigte entfernen</button>':'')+'</div>':(L.some(function(x){ return x.done; })?'<div class="btns" style="margin-bottom:8px"><button type="button" class="btn sm" data-a="citclear">Erledigte entfernen</button></div>':''))
       +'<div class="abrow" style="margin-bottom:10px"><input type="text" id="citNew" placeholder="Neuer Eintrag … (auch per Mikrofon)" maxlength="120"><button type="button" class="btn pri" data-a="citadd">'+ic('plus',18)+'</button></div><div class="ctlist">'
       +(L.length?L.map(function(x){ return '<div class="cit'+(x.done?' done':'')+'"><input type="checkbox" data-cit="'+esc(x.id)+'"'+(x.done?' checked':'')+' style="width:22px;height:22px"><span class="ct-t">'+esc(x.text)+'</span><button type="button" class="x" data-a="citdel" data-id="'+esc(x.id)+'" aria-label="Löschen">'+ic('x',16)+'</button></div>'; }).join(''):'<div class="empty">Noch leer.</div>')+'</div>'; }
-  else if(c.type==='note'){ var n=(S.citems||[]).filter(function(x){ return x.id==='note_'+c.id; })[0], keep=$('#citNote'), foc=keep&&document.activeElement===keep;
-    if(foc) return; h+='<textarea id="citNote" rows="12" maxlength="5000" placeholder="Hier schreiben … wird automatisch gespeichert." style="width:100%">'+esc((n&&n.text)||'')+'</textarea><p class="hint">'+(n&&n.ts?'Zuletzt gespeichert '+esc(fmtTime(n.ts))+(n.by&&PEOPLE.indexOf(n.by)>-1?' von '+esc(pname(n.by)):''):'Wird beim Tippen automatisch gespeichert.')+'</p>'; }
+  else if(c.type==='note'){ var T=ntTopics(c), cur=S.ntopic&&S.ntopic.tab===c.id?T.filter(function(x){ return x.id===S.ntopic.id; })[0]:null, ae=document.activeElement;
+    if(cur&&ae&&(ae.id==='citNote'||ae.id==='ntTitle')) return;
+    if(cur){ h+='<div class="btns" style="margin-bottom:8px"><button type="button" class="btn sm" data-a="ntback">‹ Alle Themen</button></div>'
+        +'<input type="text" id="ntTitle" maxlength="60" placeholder="Überschrift" value="'+esc(ntName(cur))+'" style="width:100%;font-weight:700;font-size:18px;margin-bottom:8px">'
+        +'<textarea id="citNote" rows="12" maxlength="5000" placeholder="Hier schreiben … wird automatisch gespeichert." style="width:100%">'+esc(cur.text||'')+'</textarea>'
+        +'<p class="hint">'+(cur.ts?'Zuletzt gespeichert '+esc(fmtTime(cur.ts))+(cur.by&&PEOPLE.indexOf(cur.by)>-1?' von '+esc(pname(cur.by)):''):'Wird beim Tippen automatisch gespeichert.')+'</p>'
+        +'<div class="btns"><button type="button" class="btn danger sm" data-a="ntdel" data-id="'+esc(cur.id)+'">'+(S.ntDel===cur.id?'Wirklich löschen?':'Thema löschen')+'</button></div>'; }
+    else { if(S.ntopic&&S.ntopic.tab===c.id) S.ntopic=null;
+      h+='<div class="abrow" style="margin-bottom:10px"><input type="text" id="ntNew" placeholder="Neues Thema, z. B. Urlaub, Garten …" maxlength="60"><button type="button" class="btn pri" data-a="ntadd" aria-label="Thema anlegen">'+ic('plus',18)+'</button></div>'
+        +(T.length?'<div class="ctlist">'+T.map(function(x){ var pv=String(x.text||'').replace(/\s+/g,' ').trim();
+          return '<button type="button" class="cit" data-a="ntopen" data-id="'+esc(x.id)+'" style="width:100%;text-align:left;display:block;cursor:pointer"><b style="display:block">📝 '+esc(ntName(x))+'</b><small style="color:var(--ink-2);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(pv?esc(pv.slice(0,90)):'noch leer')+(x.ts?' · '+esc(fmtTime(x.ts)):'')+'</small></button>'; }).join('')+'</div>'
+        :'<div class="empty">Noch keine Themen. Oben eine Überschrift eingeben und auf + tippen.</div>'); } }
   else { var up=[]; for(var i=0;i<180&&up.length<40;i++){ var ds=addDays(today,i); eventsOn(ds).forEach(function(ev){ if(ev.cat===c.cat) up.push({d:ds,ev:ev}); }); }
     h+='<p class="hint">Alle „'+esc((CAT[c.cat]||CAT.sonst).l)+'“-Termine der nächsten Monate.</p>'+(up.length?'<ul class="bup">'+up.map(function(u){ return '<li><div class="br"><span class="bd">'+WD[weekday(u.d)]+', '+dmy(u.d)+'</span><span class="bi" style="color:var(--ink)">'+esc((u.ev.title||(CAT[u.ev.cat]||CAT.sonst).l)+(u.ev.start?' · '+u.ev.start:'')+((u.ev.who||[]).length?' · '+u.ev.who.map(pname).join(', '):''))+'</span><button type="button" class="btn sm" data-a="edit" data-id="'+esc(u.ev.id)+'" data-d="'+u.d+'">Öffnen</button></div></li>'; }).join('')+'</ul>':'<div class="empty">Keine Termine dieser Art.</div>'); }
   box.innerHTML=h; }
@@ -2123,6 +2136,10 @@ document.addEventListener('click',function(e){
     case 'ntabsave': if(S.ntab){ var nn2=$('#ntabname'), nc=$('#ntabcat'); S.ntab.name=nn2?nn2.value.trim():''; if(nc) S.ntab.cat=nc.value; if(!S.ntab.name){ S.ntab.msg='Bitte einen Namen eingeben.'; renderSheet(); break; } var L2=(S.ctabs||[]).slice(); L2.push({id:S.store.newId().slice(-8),name:S.ntab.name.slice(0,16),type:S.ntab.type,cat:S.ntab.type==='events'?S.ntab.cat:''}); S.ctabs=L2; S.ntab=null; saveSettings('ctabs',{list:L2}); renderTabs(); renderSheet(); } break;
     case 'ctabdel': var cdid=t.dataset.id; if(S.ctabDel!==cdid){ S.ctabDel=cdid; renderSheet(); break; } S.ctabDel=''; var L3=(S.ctabs||[]).filter(function(c){ return c.id!==cdid; }); S.ctabs=L3; saveSettings('ctabs',{list:L3}); (S.citems||[]).filter(function(x){ return x.tab===cdid; }).forEach(function(x){ safe(function(){ return S.store.remove('citems',x.id); }); }); renderTabs(); renderSheet(); break;
     case 'citadd': var ci2=$('#citNew'), c2=ctab(); if(ci2&&c2){ var parts=c2.type==='list'?String(ci2.value).split(/[,;\n]+/).map(function(x){ return x.trim(); }).filter(Boolean):[]; if(!parts.length) break; ci2.value=''; var ts2=Date.now(); parts.forEach(function(tx,i){ var nid=S.store.newId(); safe(function(){ return S.store.set('citems',nid,{tab:c2.id,text:tx.slice(0,120),done:false,by:S.me||'',ts:ts2+i}); }); }); } break;
+    case 'ntadd': (function(){ var c=ctab(), inp=$('#ntNew'); if(!c||!inp) return; var tt=inp.value.trim().slice(0,60); if(!tt){ inp.focus(); toast('Bitte zuerst eine Überschrift eingeben.'); return; } var id=S.store.newId(); S.ntopic={tab:c.id,id:id}; S.ntDel=''; safe(function(){ return S.store.set('citems',id,{tab:c.id,kind:'topic',title:tt,text:'',by:S.me||'',ts:Date.now()}); }).then(function(){ renderCustom(); var ta=$('#citNote'); if(ta) ta.focus(); }); })(); break;
+    case 'ntopen': var c4=ctab(); if(c4){ S.ntopic={tab:c4.id,id:t.dataset.id}; S.ntDel=''; renderCustom(); window.scrollTo(0,0); } break;
+    case 'ntback': clearTimeout(S.noteT); clearTimeout(S.ntT); (function(){ var ta=$('#citNote'), ti=$('#ntTitle'); if(S.ntopic&&ta&&ti) ntSave({text:ta.value.slice(0,5000),title:ti.value.trim().slice(0,60)}); })(); S.ntopic=null; S.ntDel=''; if(document.activeElement) document.activeElement.blur(); renderCustom(); break;
+    case 'ntdel': var nd=t.dataset.id; if(S.ntDel!==nd){ S.ntDel=nd; renderCustom(); break; } S.ntDel=''; S.ntopic=null; clearTimeout(S.noteT); clearTimeout(S.ntT); if(document.activeElement) document.activeElement.blur(); safe(function(){ return S.store.remove('citems',nd); }).then(function(){ renderCustom(); }); break;
     case 'citclear': var cc=ctab(); if(cc) (S.citems||[]).filter(function(x){ return x.tab===cc.id&&x.done; }).forEach(function(x){ safe(function(){ return S.store.remove('citems',x.id); }); }); break;
     case 'citdel': safe(function(){ return S.store.remove('citems',t.dataset.id); }); break;
     case 'skid': S.schoolKid=t.dataset.k; renderSchool(); break;
@@ -2297,11 +2314,13 @@ document.addEventListener('input',function(e){
   if(el.id==='radr'||el.id==='cutr'||el.id==='mchr'||el.id==='btnhr'){ var kk={radr:'radv',cutr:'cutv',mchr:'mch',btnhr:'btnh'}[el.id]; lsSet(kk,el.value); applyLook(); var lb=$('#'+el.id.slice(0,-1)+'l'); if(lb) lb.textContent=el.value+' px'; return; }
   if(el.id==='bwr'){ lsSet('bwv',el.value); applyLook(); var bl=$('#bwvl'); if(bl) bl.textContent=String(el.value).replace('.',',')+' px'; return; }
   if(el.id==='cthue'||el.id==='ctlig'){ var hh=$('#cthue').value, ll=$('#ctlig').value, col='hsl('+hh+', 90%, '+ll+'%)'; lsSet('ctcol',col); applyLook(); var pv=$('#ctprev'); if(pv) pv.style.borderColor=col; $('#ctlig').style.setProperty('--h',hh); return; }
-  if(el.id==='citNote'){ var cn3=ctab(); if(!cn3) return; clearTimeout(S.noteT); S.noteT=setTimeout(function(){ safe(function(){ return S.store.set('citems','note_'+cn3.id,{tab:cn3.id,kind:'note',text:el.value.slice(0,5000),by:S.me||'',ts:Date.now()}); }); },700); return; }
+  if(el.id==='citNote'){ var tv=el.value.slice(0,5000); clearTimeout(S.noteT); S.noteT=setTimeout(function(){ ntSave({text:tv}); },700); return; }
+  if(el.id==='ntTitle'){ var tt=el.value.trim().slice(0,60); clearTimeout(S.ntT); S.ntT=setTimeout(function(){ ntSave({title:tt}); },700); return; }
   if(el.dataset&&el.dataset.eig!==undefined){ var ec=eigenCols()[0].slice(); ec[+el.dataset.eig]=el.value; lsSet('bgeig',ec.join(','));
     var sw0=document.querySelector('.sws .sw'); if(sw0){ var dk2=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); sw0.style.background=bgImage(BGST.eigen,bgTriple(BGST.eigen,0,dk2),0); }
     if(bgEdGet('bgm')==='col'&&bgEdGet('bgs')==='eigen') applyBg(); return; }
   if(el.id==='citNew') return;
+  if(el.id==='ntNew') return;
   if(el.id==='abq'){ S.abQ=el.value; renderAddrList(); return; }
   if(el.id==='fbText'){ S.fbDraft=el.value; return; }
   if(el.dataset&&el.dataset.lf&&S.lform){ S.lform[el.dataset.lf]=el.value; return; }
@@ -2456,6 +2475,7 @@ document.addEventListener('change',function(e){
   }
 });
 document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&e.target&&e.target.id==='ntNew'){ e.preventDefault(); var nb=document.querySelector('[data-a=ntadd]'); if(nb) nb.click(); return; }
   if(e.key==='Enter'&&e.target&&e.target.id==='citNew'){ e.preventDefault(); var ab=document.querySelector('[data-a=citadd]'); if(ab) ab.click(); return; }
   if(e.key==='Escape'&&S.sheet) closeSheet();
   if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('shop-item')){ e.preventDefault(); e.target.click(); }
