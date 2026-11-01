@@ -33,28 +33,30 @@ try {
     newId: () => F.doc(F.collection(db, 'ids')).id
   };
   // KI-Auswertung (Fotos, Sätze) über Gemini / Firebase AI Logic
-  let model = null;
-  async function getModel(){
-    if (model) return model;
-    const M = await import(B + 'firebase-ai.js');
-    const ai = M.getAI(app, { backend: new M.GoogleAIBackend() });
-    model = M.getGenerativeModel(ai, { model: window.FP_MODEL || 'gemini-2.5-flash', generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } });
-    return model;
+  // Modelle der Reihe nach probieren; das erste, das antwortet, wird gemerkt
+  const MODELS = [window.FP_MODEL, (() => { try { return localStorage.getItem('fp2_aimodel'); } catch (e) { return null; } })(), 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-flash-latest'].filter((x, i, a) => x && a.indexOf(x) === i);
+  let aiM = null, ai = null; const models = {};
+  async function getModel(name){
+    if (!aiM) { aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
+    return models[name] || (models[name] = aiM.getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } }));
   }
   const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
   const sample = {
     limits: () => Promise.resolve({ images: true }),
     json: async (prompt, opt) => {
       if (!navigator.onLine) throw { code: 'offline' };
-      const md = await getModel();
       const parts = [{ text: prompt }];
       for (const bl of ((opt && opt.images) || [])) parts.push({ inlineData: { data: await b64(bl), mimeType: bl.type || 'image/jpeg' } });
-      let r;
-      try { r = await md.generateContent(parts); }
-      catch (e) {
-        const s = String((e && e.message) || e);
-        throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: s };
+      let r = null, last = '';
+      for (const name of MODELS) {
+        try { r = await (await getModel(name)).generateContent(parts); try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break; }
+        catch (e) {
+          const s = String((e && e.message) || e); last = s;
+          if (/\b404\b|not found|not supported|is not available|no longer|retired|deprecated/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
+          throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: name + ': ' + s.slice(-160) };
+        }
       }
+      if (!r) throw { code: 'failed', message: 'Kein Modell erreichbar: ' + last.slice(-160) };
       let t = r.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
       try { return JSON.parse(t); } catch (e) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a > -1 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (x) {} } throw { code: 'invalid_json', message: t.slice(0, 120) }; }
     }
