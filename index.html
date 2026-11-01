@@ -109,6 +109,9 @@ body.glas .card,body.glas .panel{background:color-mix(in srgb,var(--surface) 80%
 .mbins{display:flex;gap:2px;flex-wrap:nowrap;height:9px;overflow:hidden;flex:none}
 .mbins i{width:9px;height:9px;border-radius:2px;background:var(--bc);flex:none}
 .prows{display:grid;grid-auto-rows:18px;row-gap:2px;width:100%;margin-top:2px}.pr{display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap}.pr .sh{flex:none;min-width:17px;height:17px;padding:0 2px;font-size:10px}.pr .me{flex:none}.pr .me b{display:inline;max-width:70px;overflow:hidden;text-overflow:ellipsis}.prb{gap:2px}.pb{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bc);flex:none}.day .prows{justify-items:center}.day .pr{justify-content:center}
+.sh.swp{background-image:repeating-linear-gradient(135deg,var(--pc) 0 3px,color-mix(in srgb,var(--pc) 45%,#fff) 3px 6px)!important;color:#1b1f26!important;text-shadow:0 0 2px #fff}
+.ftc{display:grid;gap:6px;padding:12px;border:1.5px solid var(--line2);border-radius:14px;margin-bottom:10px}.ftc h3{margin:0;font-size:16px;display:flex;gap:8px;align-items:center}.ftt{display:flex;flex-wrap:wrap;gap:6px;font-size:14px}.ftt b{font-weight:700;color:var(--ink-2);font-size:12px;width:100%}.ftt span{padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--ink) 8%,transparent);font-variant-numeric:tabular-nums}.ftph{display:flex;gap:8px;flex-wrap:wrap}.ftph button{padding:0;border:0;background:none;cursor:pointer;position:relative}.ftph img{width:92px;height:70px;object-fit:cover;border-radius:8px;display:block}.ftbig{width:100%;border-radius:10px;display:block}
+.hrt{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}.hrt td,.hrt th{padding:5px 4px;border-top:1px solid var(--line);text-align:right}.hrt td:first-child,.hrt th:first-child{text-align:left}.hrin{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:400px){.pb{width:7px;height:7px}.pr .sh{min-width:15px;height:15px;font-size:9px}.prows{grid-auto-rows:16px}}
 .msh .sh.ph,.wsh .sh.ph{visibility:hidden}.msh{flex-direction:column;align-items:flex-start;flex-wrap:nowrap}body.shrow .msh{flex-direction:row;flex-wrap:wrap}body.shrow .wsh{flex-direction:row;flex-wrap:wrap;justify-content:center}
 html body.ctx input:not([type=range]):not([type=checkbox]),html body.ctx select,html body.ctx textarea,html body.ctx .wheel,html body.ctx .btn:not(.pri):not(.danger),html body.ctx .chip:not([aria-pressed=true]),html body.ctx .icon-btn,html body.ctx .mc,html body.ctx .day,html body.ctx .scr,html body.ctx .ttd,html body.ctx .ct,html body.ctx .mrow,html body.ctx .tabrow,html body.ctx .bup,html body.ctx .seg,html body.ctx .panel,html body.ctx .bin,html body.ctx .chi,html body.ctx .sday,html body.ctx .bpd,html body.ctx .lsbox{border-width:var(--bw)!important;border-color:var(--bcol)!important;border-style:solid!important}
@@ -842,7 +845,7 @@ function renderNotice(){
 var TABS=['cal','muell','shop','notes','school','addr'];
 /* Handy-Zurück-Taste: für jede geöffnete Ebene ein Verlaufseintrag, Zurück geht genau eine Ebene zurück */
 function navDepth(){ var d=0; if(S.tab!=='cal') d++; if(S.tab==='notes'&&S.chatOpen) d++; if(/^c_/.test(S.tab||'')&&S.ntopic&&S.ntopic.tab===String(S.tab).slice(2)) d++;
-  if(S.sheet){ d++; if(S.sheet==='settings') d+=(S.mstack||[]).length+(S.menuPage?1:0); if(S.sheet==='help') d++; if(S.sheet==='event'&&S.form&&S.form.id&&!S.form.view) d++; }
+  if(S.sheet){ d++; if(S.sheet==='settings') d+=(S.mstack||[]).length+(S.menuPage?1:0)+(S.menuPage==='fahrt'?(S.ft?1:0)+(S.ftView?1:0):0); if(S.sheet==='help') d++; if(S.sheet==='event'&&S.form&&S.form.id&&!S.form.view) d++; }
   if(document.querySelector('.ztview,.peview')) d++; return d; }
 function navSync(){ if(S.popping||!window.history||!history.pushState) return; S.hd=S.hd||0; var d=navDepth();
   try{ if(d>S.hd){ while(S.hd<d){ S.hd++; history.pushState({fp:S.hd},''); } } else if(d<S.hd){ var n=S.hd-d; S.hd=d; S.ignorePop=(S.ignorePop||0)+1; history.go(-n); } }catch(e){} }
@@ -1003,11 +1006,11 @@ function applyLook(){ var b=document.body; if(!b) return; b.classList.toggle('sh
   var bh=parseFloat(lsGet('btnh')); if(bh>0){ r.style.setProperty('--btnh',bh+'px'); b.classList.add('szb'); } }
 function rowOrder(){ var v=[]; if(S.me&&S.rowOrd&&Array.isArray(S.rowOrd[S.me])) v=S.rowOrd[S.me].slice(); else try{ v=JSON.parse(lsGet('roworder')||'[]'); }catch(e){} if(!Array.isArray(v)) v=[]; var all=['bins'].concat(PEOPLE); v=v.filter(function(k){ return all.indexOf(k)>-1; }); all.forEach(function(k){ if(v.indexOf(k)<0) v.push(k); }); return v; }
 function dayCell(s,act,mf){ var d={bins:binsOn(s),it:{},sh:{}}; eventsOn(s).forEach(function(ev){ if(isAll(ev)||SHIFTCAT[ev.cat]) return; var va=evVis(ev); (ev.who||[]).forEach(function(k){ if(act.indexOf(k)>-1&&(va||mf.indexOf(k)>-1)) (d.it[k]=d.it[k]||[]).push(ev); }); });
-  act.forEach(function(k){ if(mf.indexOf(k)>-1){ var c=shiftOn(k,s); if(c.length) d.sh[k]=c[0]; } }); return d; }
-function usedRows(days,act){ return rowOrder().filter(function(k){ if(k==='bins') return days.some(function(d){ return d.bins.length; }); if(act.indexOf(k)<0) return false; return days.some(function(d){ return d.sh[k]||(d.it[k]&&d.it[k].length); }); }); }
+  d.sw={}; act.forEach(function(k){ if(mf.indexOf(k)>-1){ var c=shiftOn(k,s); if(c.length) d.sh[k]=c[0]; if(shSwap(k,s)) d.sw[k]=s; } }); return d; }
+function usedRows(days,act){ return rowOrder().filter(function(k){ if(k==='bins') return days.some(function(d){ return d.bins.length; }); if(act.indexOf(k)<0) return false; return days.some(function(d){ return d.sh[k]||(d.sw&&d.sw[k])||(d.it[k]&&d.it[k].length); }); }); }
 function rowsHTML(d,rows,withText){ return '<span class="prows">'+rows.map(function(k){ var h='';
     if(k==='bins') h=d.bins.map(function(b){ return '<i class="pb" style="--bc:var(--bin-'+b.k+')"></i>'; }).join('');
-    else { h=(d.sh[k]?'<span class="sh" style="--pc:var(--p-'+k+')">'+esc(d.sh[k])+'</span>':'')+(d.it[k]||[]).slice(0,3).map(function(ev){ var c=CAT[ev.cat]||CAT.sonst; return '<span class="me" style="--pc:var(--p-'+k+')">'+ci(c,12,ev)+(withText?'<b>'+esc(ev.title||c.l)+'</b>':'')+'</span>'; }).join(''); }
+    else { h=((d.sw&&d.sw[k])?shSpan(k,d.sh[k]||'',d.sw[k]):d.sh[k]?'<span class="sh" style="--pc:var(--p-'+k+')">'+esc(d.sh[k])+'</span>':'')+(d.it[k]||[]).slice(0,3).map(function(ev){ var c=CAT[ev.cat]||CAT.sonst; return '<span class="me" style="--pc:var(--p-'+k+')">'+ci(c,12,ev)+(withText?'<b>'+esc(ev.title||c.l)+'</b>':'')+'</span>'; }).join(''); }
     return '<span class="pr'+(k==='bins'?' prb':'')+'"'+(k!=='bins'?' style="--pc:var(--p-'+k+')"':'')+'>'+h+'</span>'; }).join('')+'</span>'; }
 function monthHTML(sel,today,act){
   var mf=monthFilter(), mfN=act.filter(function(k){ return mf.indexOf(k)>-1; }).length, colMode=shLay()==='col', CD={}, ROWS=[];
@@ -1019,7 +1022,7 @@ function monthHTML(sel,today,act){
   for(var i=0;i<weeks*7;i++){
     var s=addDays(start,i), inM=(+s.slice(5,7)===m+1), info=dayInfo(s), items=[];
     eventsOn(s).forEach(function(ev){ if(isAll(ev)||SHIFTCAT[ev.cat]) return; var va=evVis(ev); (ev.who||[]).forEach(function(k){ if(act.indexOf(k)>-1&&(va||mf.indexOf(k)>-1)) items.push({ev:ev,k:k}); }); });
-    var shl=act.filter(function(k){ return mf.indexOf(k)>-1; }).map(function(k){ var cs=shiftOn(k,s); return cs.length?'<span class="sh" style="--pc:var(--p-'+k+')">'+esc(cs[0])+'</span>':'<span class="sh ph" aria-hidden="true"></span>'; }).join('');
+    var shl=act.filter(function(k){ return mf.indexOf(k)>-1; }).map(function(k){ var cs=shiftOn(k,s); return (cs.length||shSwap(k,s))?shSpan(k,cs[0]||'',s):'<span class="sh ph" aria-hidden="true"></span>'; }).join('');
     var chips=items.slice(0,4).map(function(it){
       var c=CAT[it.ev.cat]||CAT.sonst;
       return '<span class="me" style="--pc:var(--p-'+it.k+')">'+ci(c,12)+'<b>'+esc(it.ev.title||c.l)+'</b></span>';
@@ -1184,7 +1187,7 @@ function rcpt(k){ return (S.settingsRows||{})['rcpt_'+k]||{}; }
 function rcptSave(ch){ if(!S.me||!S.store) return; var sv=rcpt(S.me)||{}, mi=S.rcptMine||{}, o={rcv:Math.max(sv.rcv||0,mi.rcv||0),rd:{}}; if(sv.ack) o.ack=1; [sv.rd||{},mi.rd||{}].forEach(function(r){ Object.keys(r).forEach(function(k){ o.rd[k]=Math.max(o.rd[k]||0,r[k]||0); }); }); var dirty=false;
   if(ch.rcv&&ch.rcv>(o.rcv||0)){ o.rcv=ch.rcv; dirty=true; } if(ch.cid&&ch.rd&&ch.rd>(o.rd[ch.cid]||0)){ o.rd[ch.cid]=ch.rd; if((o.rcv||0)<ch.rd) o.rcv=ch.rd; dirty=true; }
   if(!dirty) return; S.rcptMine=o; clearTimeout(S.rcptT); S.rcptT=setTimeout(function(){ saveSettings('rcpt_'+S.me,S.rcptMine); },1500); }
-function rcptHTML(c,n){ var to=(c.fam?activePeople():(c.members||[])).filter(function(k){ return k!==S.me&&!isGenName(k)&&PEOPLE.indexOf(k)>-1; }); if(!to.length) return '';
+function rcptHTML(c,n){ var to=(c.fam?activePeople():(c.members||[])).filter(function(k){ return k!==S.me&&!isGenName(k)&&PEOPLE.indexOf(k)>-1&&!(S.people[k]&&S.people[k].nophone); }); if(!to.length) return '';
   var rd=to.filter(function(k){ var r=rcpt(k); return ((r.rd||{})[c.id]||0)>=n.ts; }), dl=to.every(function(k){ return rd.indexOf(k)>-1||(rcpt(k).rcv||0)>=n.ts; });
   var ackOn=to.some(function(k){ return !!rcpt(k).ack; }), late=ackOn&&!dl&&Date.now()-n.ts>10000; if(!dl&&!late){ clearTimeout(S.rcptRT); S.rcptRT=setTimeout(function(){ if(S.tab==='notes'&&S.chatOpen) renderNotes(); },Math.max(500,10500-(Date.now()-n.ts))); }
   var miss=to.filter(function(k){ return rd.indexOf(k)<0&&!((rcpt(k).rcv||0)>=n.ts); }), open=!dl&&S.rcptWho===n.id&&miss.length;
@@ -1585,6 +1588,8 @@ function planCode(k,s){
   var n=a.length, i=(((dayNum(s)-dayNum(p.start))%n)+n)%n, c=a[i];
   return c==='-'?'':c;
 }
+function shSwap(k,s){ var o=S.shifts[k+'_'+s]; if(!o||o.code===undefined) return false; return (o.code==='-'?'':o.code)!==planCode(k,s); }
+function shSpan(k,c,s){ var sw=shSwap(k,s); if(!c&&!sw) return ''; return '<span class="sh'+(sw?' swp':'')+'" style="--pc:var(--p-'+k+')"'+(sw?' title="Getauscht (Plan: '+esc(planCode(k,s)||'frei')+')"':'')+'>'+esc(c||'–')+'</span>'; }
 function shiftOn(k,s){
   var out=[], o=S.shifts[k+'_'+s], c;
   if(o) c=(o.code==='-')?'':o.code; else c=planCode(k,s);
@@ -1609,9 +1614,9 @@ function shiftEditHTML(){
     var eff=shiftOn(k,S.sel)[0]||'', tm=shiftTimes(k,S.sel);
     return '<div class="shrow" style="--pc:var(--p-'+k+')"><span class="who" style="justify-self:start">'+esc(pname(k))+'</span><div class="chips">'+opts.map(function(p){
       return '<button type="button" class="chip" data-a="setshift" data-k="'+k+'" data-v="'+p[0]+'" aria-pressed="'+(cur===p[0])+'">'+p[1]+'</button>';
-    }).join('')+'</div>'
+    }).join('')+'</div>'+(shSwap(k,S.sel)?'<p class="hint" style="margin:4px 0 0">⇄ Getauscht · laut Plan: '+esc(planCode(k,S.sel)||'frei')+'</p>':'')
       +(eff?(S.shTimeEdit===k?'<div class="plt shtm">'+timeSelects('sh:a:'+k,tm.a,true)+'<span>bis</span>'+timeSelects('sh:b:'+k,tm.b,true)+'</div><button type="button" class="btn sm pri" data-a="shtedit" data-k="">Fertig</button>':'<div class="shtm" style="display:flex;align-items:center;gap:10px"><span>🕒 '+(tm.a&&tm.b?esc(tm.a)+'–'+esc(tm.b)+' Uhr':'keine Uhrzeit')+'</span><button type="button" class="btn sm" data-a="shtedit" data-k="'+k+'">Uhrzeit ändern</button></div>'):'')+'</div>';
-  }).join('')+'<p class="hint">„Plan“ nimmt die Schicht aus dem Schichtplan. Die anderen Knöpfe und die Uhrzeit ändern nur diesen einen Tag. Zum Verschieben: hier „Frei“ wählen und am neuen Tag die Schicht setzen.</p><div class="btns"><button type="button" class="btn sm" data-a="plan">Schichtplan einrichten</button></div></div>';
+  }).join('')+'<p class="hint">„Plan“ nimmt die Schicht aus dem Schichtplan. Die anderen Knöpfe und die Uhrzeit ändern nur diesen einen Tag. Zum Verschieben: hier „Frei“ wählen und am neuen Tag die Schicht setzen. Geänderte Tage sind im Kalender gestreift.</p><div class="btns"><button type="button" class="btn sm" data-a="plan">Schichtplan einrichten</button></div></div>';
 }
 function shiftSheetHTML(){
   var title=new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric',month:'long'}).format(parse(S.sel));
@@ -1999,7 +2004,7 @@ function eventSheetHTML(){
     +buttons;
 }
 function menuStyleVars(){ var cur=bgEdGet('bgs')||'metal', ui=BGST[S.bgUi||cur]||BGST.metal, on=bgEdGet('bgm')==='col'&&cur===ui.k, v=bgEdGet('bgv'), dk=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); return {cur:cur,ui:ui,on:on,v:v,dk:dk}; }
-var MENUP=[['ichbin','🙋','Ich bin'],['familie','👨‍👩‍👧‍👦','Familie und Weitere'],['wecker','⏰','Erinnerungen & Wecker'],['darst','🌗','Darstellung · Datum & Uhrzeit'],['stil','🎨','Hintergrund & Farben'],['reiter','🗂️','Reiter-Leiste']];
+var MENUP=[['ichbin','🙋','Ich bin'],['familie','👨‍👩‍👧‍👦','Familie und Weitere'],['wecker','⏰','Erinnerungen & Wecker'],['darst','🌗','Darstellung · Datum & Uhrzeit'],['stil','🎨','Hintergrund & Farben'],['reiter','🗂️','Reiter-Leiste'],['fahrt','🚌','Fahrpläne'],['stunden','⏱️','Stundenzähler']];
 function menuSummary(k){ var m=menuStyleVars();
   if(k==='wecker'){ var n=0; Object.keys(S.alarms||{}).forEach(function(p){ Object.keys(S.alarms[p]||{}).forEach(function(c){ if(S.alarms[p][c]&&S.alarms[p][c].on) n++; }); }); return n?n+' Schicht-Wecker':''; }
   if(k==='darst') return (({light:'Hell',dark:'Dunkel',auto:'Wie das Handy'})[S.theme]||'')+' · '+(shLay()==='row'?'nebeneinander':'untereinander');
@@ -2009,6 +2014,8 @@ function menuSummary(k){ var m=menuStyleVars();
   if(k==='reiter') return ({bottom:'Unten',top:'Oben',left:'Links',right:'Rechts'})[navPos()]+(navFold()?' · einklappbar':'');
   if(k==='ichbin') return S.me?pname(S.me):'nicht gewählt';
   if(k==='familie') return activePeople().length+' aktiv';
+  if(k==='fahrt'){ var fl=ftList().length; return fl?fl+(fl===1?' Haltestelle':' Haltestellen'):'Bus, S-Bahn, Zug'; }
+  if(k==='stunden'){ var hn=Object.keys(hrCfg()).filter(function(p){ return hrCfg()[p].on; }).length; return hn?'an für '+hn:'aus (freiwillig)'; }
   return ''; }
 function remPrefHTML(){ var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">🙋 So werde ich erinnert</b>';
   if(!S.me||isGenName(S.me)) return h+'<p class="hint">Bitte zuerst unter Menü → „Ich bin“ auswählen, wer dieses Handy benutzt. Jede Person stellt das hier für sich selbst ein.</p></div>';
@@ -2030,6 +2037,82 @@ function shHead(title,root){
   return '<div class="sh-h">'+(root?'<span style="width:44px"></span>':'<button type="button" class="btn sm" data-a="mback" aria-label="Eine Seite zurück">'+ic('chevL',18)+' Zurück</button>')
     +'<h2 style="flex:1;text-align:center;font-size:18px;margin:0">'+esc(title)+'</h2>'
     +'<button class="icon-btn" data-a="close" aria-label="Zur Monatsübersicht">'+ic('x')+'</button></div>'; }
+
+// ---------- Fahrpläne (Menü) ----------
+var FTT={bus:['🚌','Bus'],sbahn:['🚈','S-Bahn'],zug:['🚆','Zug'],tram:['🚋','Straßenbahn']};
+function ftList(){ var r=(S.settingsRows||{}).fahrplan; return (r&&Array.isArray(r.list))?r.list:[]; }
+function ftTimes(v){ return String(v||'').split(/[,;\s]+/).map(function(x){ var m=/^(\d{1,2})[:.]?(\d{2})$/.exec(x.trim()); return m&&+m[1]<24&&+m[2]<60?pad(+m[1])+':'+m[2]:''; }).filter(Boolean).filter(function(x,i,a){ return a.indexOf(x)===i; }).sort(); }
+function ftGrab(){ var f=S.ft; if(!f) return; [['line','ftLine'],['stop','ftStop'],['hin','ftHin'],['rueck','ftRueck'],['days','ftDays'],['note','ftNote']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
+function ftHTML(){
+  if(S.ftView){ var ph=(S.citems||[]).filter(function(x){ return x.id===S.ftView; })[0]; if(ph) return '<img class="ftbig" src="'+esc(ph.data)+'" alt="Foto vom Fahrplan"><div class="btns"><button type="button" class="btn" data-a="ftviewx">Schließen</button></div>'; S.ftView=''; }
+  var f=S.ft;
+  if(f){ var phs=f.id?ntPhotos(f.id):[];
+    return '<div class="fld"><span class="lbl">Art</span><div class="chips">'+Object.keys(FTT).map(function(k){ return '<button type="button" class="chip" data-a="fttype" data-v="'+k+'" aria-pressed="'+(f.type===k)+'">'+FTT[k][0]+' '+FTT[k][1]+'</button>'; }).join('')+'</div></div>'
+      +'<div class="hrin"><div class="fld"><label class="lbl" for="ftLine">Linie</label><input type="text" id="ftLine" maxlength="20" value="'+esc(f.line||'')+'" placeholder="z. B. 51"></div><div class="fld"><label class="lbl" for="ftDays">Tage</label><input type="text" id="ftDays" maxlength="30" value="'+esc(f.days||'')+'" placeholder="z. B. Mo–Fr, Schultage"></div></div>'
+      +'<div class="fld"><label class="lbl" for="ftStop">Haltestelle</label><input type="text" id="ftStop" maxlength="60" value="'+esc(f.stop||'')+'" placeholder="z. B. Usingen Bahnhof"></div>'
+      +'<div class="fld"><span class="lbl">Für wen?</span><div class="chips">'+activePeople().map(function(k){ return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="ftwho" data-k="'+k+'" aria-pressed="'+((f.who||[]).indexOf(k)>-1)+'"><i class="pd"></i>'+esc(pname(k))+'</button>'; }).join('')+'</div></div>'
+      +'<div class="fld"><label class="lbl" for="ftHin">Hinfahrt: Abfahrt hier</label><input type="text" id="ftHin" inputmode="numeric" value="'+esc(f.hin||'')+'" placeholder="z. B. 7:12, 7:40"></div>'
+      +'<div class="fld"><label class="lbl" for="ftRueck">Rückfahrt: Ankunft hier</label><input type="text" id="ftRueck" inputmode="numeric" value="'+esc(f.rueck||'')+'" placeholder="z. B. 12:35, 13:20"></div>'
+      +'<p class="hint">Mehrere Uhrzeiten mit Komma trennen.</p>'
+      +'<div class="fld"><label class="lbl" for="ftNote">Notiz</label><textarea id="ftNote" rows="2" maxlength="300" placeholder="z. B. Freitags früher, nur an Schultagen">'+esc(f.note||'')+'</textarea></div>'
+      +'<div class="fld"><span class="lbl">Fotos (Aushang, Fahrplan)</span>'+(f.id?'<div class="ftph">'+phs.map(function(x){ return '<button type="button" data-a="ftview" data-id="'+esc(x.id)+'" aria-label="Foto groß ansehen"><img src="'+esc(x.data)+'" alt=""></button>'+(S.ftPhDel===x.id?'<button type="button" class="btn sm dng" data-a="ftphdel" data-id="'+esc(x.id)+'">Wirklich löschen?</button>':'<button type="button" class="btn sm" data-a="ftphdel" data-id="'+esc(x.id)+'" aria-label="Foto löschen">🗑</button>'); }).join('')+'</div><label class="btn sm filebtn" style="margin-top:8px">'+(S.ftBusy?'Wird geladen …':'📷 Foto aufnehmen oder wählen')+'<input type="file" class="ftphoto" accept="image/*"></label>':'<p class="hint">Fotos kannst du hinzufügen, sobald der Eintrag gespeichert ist.</p>')+'</div>'
+      +(f.msg?'<p class="hint err">'+esc(f.msg)+'</p>':'')
+      +'<div class="btns"><button type="button" class="btn pri grow" data-a="ftsave">Speichern</button>'+(f.id?'<button type="button" class="btn danger" data-a="ftdel">'+(f.del?'Wirklich löschen?':'Löschen')+'</button>':'')+'</div>'; }
+  var L=ftList();
+  return (L.length?L.map(function(x){ var t=FTT[x.type]||FTT.bus, phs=ntPhotos(x.id);
+      return '<div class="ftc"><h3>'+t[0]+' '+esc(t[1]+(x.line?' '+x.line:''))+'<button type="button" class="btn sm" style="margin-left:auto" data-a="ftedit" data-id="'+esc(x.id)+'">Bearbeiten</button></h3>'
+        +'<div><b>'+esc(x.stop||'Haltestelle')+'</b>'+(x.days?' · '+esc(x.days):'')+'</div>'
+        +((x.who||[]).length?'<div class="chips">'+x.who.filter(function(k){ return PEOPLE.indexOf(k)>-1; }).map(function(k){ return '<span class="chip" style="--pc:var(--p-'+k+')"><i class="pd"></i>'+esc(pname(k))+'</span>'; }).join('')+'</div>':'')
+        +(x.hin&&x.hin.length?'<div class="ftt"><b>Hinfahrt (Abfahrt)</b>'+x.hin.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div>':'')
+        +(x.rueck&&x.rueck.length?'<div class="ftt"><b>Rückfahrt (Ankunft)</b>'+x.rueck.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div>':'')
+        +(x.note?'<p class="hint" style="margin:0">'+esc(x.note)+'</p>':'')
+        +(phs.length?'<div class="ftph">'+phs.map(function(p){ return '<button type="button" data-a="ftview" data-id="'+esc(p.id)+'" aria-label="Foto groß ansehen"><img src="'+esc(p.data)+'" alt=""></button>'; }).join('')+'</div>':'')+'</div>'; }).join('')
+    :'<p class="hint">Noch keine Fahrpläne. Lege für jede Haltestelle einen Eintrag an, zum Beispiel den Schulbus mit beiden Haltestellen.</p>')
+    +'<div class="btns"><button type="button" class="btn pri" data-a="ftnew">+ Haltestelle hinzufügen</button></div>'; }
+function ftSaveList(L){ var o={list:L}; S.settingsRows=S.settingsRows||{}; S.settingsRows.fahrplan=o; return saveSettings('fahrplan',o); }
+function ftClick(a,t){
+  if(a==='ftnew'){ S.ft={type:'bus',who:[],line:'',stop:'',hin:'',rueck:'',days:'',note:''}; renderSheet(); shTop(); return true; }
+  if(a==='ftedit'){ var x=ftList().filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.ft={id:x.id,type:x.type||'bus',who:(x.who||[]).slice(),line:x.line||'',stop:x.stop||'',hin:(x.hin||[]).join(', '),rueck:(x.rueck||[]).join(', '),days:x.days||'',note:x.note||''}; renderSheet(); shTop(); return true; }
+  if(a==='fttype'){ ftGrab(); S.ft.type=t.dataset.v; renderSheet(); return true; }
+  if(a==='ftwho'){ ftGrab(); var w=S.ft.who, i=w.indexOf(t.dataset.k); if(i>-1) w.splice(i,1); else w.push(t.dataset.k); renderSheet(); return true; }
+  if(a==='ftsave'){ ftGrab(); var f=S.ft; if(!String(f.stop||'').trim()){ f.msg='Bitte die Haltestelle eintragen.'; renderSheet(); return true; }
+    var rec={id:f.id||S.store.newId(),type:f.type,line:String(f.line||'').trim().slice(0,20),stop:String(f.stop).trim().slice(0,60),days:String(f.days||'').trim().slice(0,30),who:f.who.slice(),hin:ftTimes(f.hin),rueck:ftTimes(f.rueck),note:String(f.note||'').trim().slice(0,300),by:S.me||'',ts:Date.now()};
+    var L=ftList().slice(), ix=-1; L.forEach(function(y,i){ if(y.id===rec.id) ix=i; }); if(ix>-1) L[ix]=rec; else L.push(rec);
+    ftSaveList(L); if(f.id){ S.ft=null; } else { S.ft.id=rec.id; S.ft.msg=''; S.ft.hin=rec.hin.join(', '); S.ft.rueck=rec.rueck.join(', '); toast('Gespeichert. Jetzt kannst du Fotos hinzufügen.'); } renderSheet(); return true; }
+  if(a==='ftdel'){ var f2=S.ft; if(!f2.del){ ftGrab(); f2.del=true; renderSheet(); return true; } ntPhotos(f2.id).forEach(function(x){ safe(function(){ return S.store.remove('citems',x.id); }); }); ftSaveList(ftList().filter(function(y){ return y.id!==f2.id; })); S.ft=null; renderSheet(); shTop(); return true; }
+  if(a==='ftview'){ if(S.ft) ftGrab(); S.ftView=t.dataset.id; renderSheet(); shTop(); return true; }
+  if(a==='ftviewx'){ S.ftView=''; renderSheet(); return true; }
+  if(a==='ftphdel'){ ftGrab(); var pid=t.dataset.id; if(S.ftPhDel!==pid){ S.ftPhDel=pid; renderSheet(); return true; } S.ftPhDel=''; safe(function(){ return S.store.remove('citems',pid); }).then(function(){ setTimeout(renderSheet,200); }); return true; }
+  return false; }
+document.addEventListener('click',function(e){ var t=e.target.closest('[data-a]'); if(!t||!/^ft/.test(t.dataset.a)) return; if(ftClick(t.dataset.a,t)){ e.stopImmediatePropagation(); try{ navSync(); }catch(x){} } },true);
+document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.classList||!el.classList.contains('ftphoto')) return; e.stopImmediatePropagation(); var file=el.files&&el.files[0], f=S.ft; el.value=''; if(!file||!f||!f.id) return; ftGrab(); S.ftBusy=true; renderSheet();
+  ntImg(file,function(d){ S.ftBusy=false; if(!d){ toast('Das Foto konnte nicht gelesen werden.'); renderSheet(); return; } var now=Date.now(); safe(function(){ return S.store.set('citems',S.store.newId(),{kind:'photo',topic:f.id,data:d,by:S.me||'',ts:now,ct:now}); }).then(function(){ setTimeout(function(){ if(S.sheet==='settings') renderSheet(); },200); }); }); },true);
+
+// ---------- Stundenzähler (freiwillig) ----------
+function hrCfg(){ var r=(S.settingsRows||{}).hours; return (r&&typeof r==='object')?(r.cfg||{}):{}; }
+function hrSave(c){ var o={cfg:c}; S.settingsRows=S.settingsRows||{}; S.settingsRows.hours=o; saveSettings('hours',o); }
+function hrMin(t){ var m=/^(\d{1,2}):(\d{2})$/.exec(t||''); return m?(+m[1])*60+(+m[2]):null; }
+function hrFmt(m){ var neg=m<0; m=Math.abs(Math.round(m)); return (neg?'−':'')+Math.floor(m/60)+':'+pad(m%60); }
+function hrMonth(k,ym,c){ var y=+ym.slice(0,4), mo=+ym.slice(5,7), dim=new Date(y,mo,0).getDate(), cnt={}, tot=0, miss=0;
+  for(var d=1;d<=dim;d++){ var s=ym+'-'+pad(d), code=shiftOn(k,s)[0]; if(!code) continue; cnt[code]=(cnt[code]||0)+1; var tm=shiftTimes(k,s), a=hrMin(tm.a), b=hrMin(tm.b); if(a===null||b===null){ miss++; continue; } var du=b-a; if(du<=0) du+=1440; if(du>360) du-=(+c.pause||0); tot+=Math.max(0,du); }
+  return {cnt:cnt,tot:tot,miss:miss}; }
+function hrHTML(){ var C=hrCfg(), act=activePeople(), ym=S.hrYm||ymd(new Date()).slice(0,7), y=+ym.slice(0,4), mo=+ym.slice(5,7);
+  var h='<p class="hint">Freiwillig: Nur wer hier eingeschaltet ist, wird gezählt. Die Stunden kommen aus den Schicht-Uhrzeiten im Kalender.</p>';
+  h+=act.map(function(k){ var c=C[k]||{}; return '<div class="panel" style="margin:0 0 10px;--pc:var(--p-'+k+')"><label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" data-hr="on" data-k="'+k+'"'+(c.on?' checked':'')+'><i class="pd"></i>'+esc(pname(k))+'</label>'
+    +(c.on?'<div class="hrin" style="margin-top:8px"><div class="fld"><label class="lbl">Pause pro Schicht (Min.)</label><input type="number" min="0" max="120" step="5" inputmode="numeric" data-hr="pause" data-k="'+k+'" value="'+(c.pause!=null?c.pause:30)+'"></div><div class="fld"><label class="lbl">Soll pro Monat (Std., optional)</label><input type="number" min="0" max="300" step="0.5" inputmode="decimal" data-hr="soll" data-k="'+k+'" value="'+(c.soll||'')+'"></div></div><p class="hint" style="margin:0">Die Pause wird nur bei Schichten über 6 Stunden abgezogen.</p>':'')+'</div>'; }).join('');
+  var on=act.filter(function(k){ return (C[k]||{}).on; });
+  if(on.length){ h+='<div class="fld"><div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><button type="button" class="btn sm" data-a="hrym" data-v="-1" aria-label="Monat zurück">'+ic('chevL',18)+'</button><b>'+esc(MON[mo-1]+' '+y)+'</b><button type="button" class="btn sm" data-a="hrym" data-v="1" aria-label="Monat vor">'+ic('chevR',18)+'</button></div>';
+    h+=on.map(function(k){ var c=C[k], r=hrMonth(k,ym,c), codes=Object.keys(r.cnt).sort(), soll=parseFloat(String(c.soll||'').replace(',','.'));
+      return '<table class="hrt" style="margin-top:10px"><tr><th colspan="2" style="color:var(--p-'+k+')">'+esc(pname(k))+'</th></tr>'
+        +(codes.length?codes.map(function(cd){ return '<tr><td>'+esc(({F:'Frühschicht',S:'Spätschicht',N:'Nachtschicht',TD:'Tagdienst'})[cd]||cd)+'</td><td>'+r.cnt[cd]+'×</td></tr>'; }).join(''):'<tr><td colspan="2">Keine Schichten in diesem Monat</td></tr>')
+        +'<tr><td><b>Stunden</b></td><td><b>'+hrFmt(r.tot)+'</b></td></tr>'
+        +(soll>0?'<tr><td>Soll</td><td>'+hrFmt(soll*60)+'</td></tr><tr><td>'+(r.tot-soll*60>=0?'Plusstunden':'Minusstunden')+'</td><td><b>'+hrFmt(r.tot-soll*60)+'</b></td></tr>':'')
+        +(r.miss?'<tr><td colspan="2" class="hint">'+r.miss+' Schicht(en) ohne Uhrzeit nicht mitgezählt</td></tr>':'')+'</table>'; }).join('')+'</div>'; }
+  return h; }
+document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="hrym"]'); if(!t) return; e.stopImmediatePropagation(); var ym=S.hrYm||ymd(new Date()).slice(0,7), d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+(+t.dataset.v),1); S.hrYm=d.getFullYear()+'-'+pad(d.getMonth()+1); renderSheet(); },true);
+document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
+  if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
+  hrSave(C); renderSheet(); },true);
 function settingsSheetHTML(){
   var pg=S.menuPage||'';
   if(!pg) return shHead('Menü',true)
@@ -2047,6 +2130,8 @@ function settingsSheetHTML(){
       +(ui.eigen?(function(){ var ec=eigenCols()[0]; return '<div class="eigw">'+[['Grundfarbe',0],['Mitte',1],['Zweite Farbe',2]].map(function(o){ return '<label class="eigc"><span>'+o[0]+'</span><input type="color" data-eig="'+o[1]+'" value="'+ec[o[1]]+'"></label>'; }).join('')+'</div><p class="hint">Such dir drei Farben aus. Das Feld oben ändert sich sofort mit. Tipp danach darauf, damit die Farben übernommen werden.</p>'; })():'')
       +'</div>'; }
   else if(pg==='wecker') body=pushHTML()+weckerHTML();
+  else if(pg==='fahrt') body=ftHTML();
+  else if(pg==='stunden') body=hrHTML();
   if(pg==='darst'||pg==='zeit') body+='<div class="fld"><span class="lbl">Datum und Uhrzeit auswählen</span><div class="chips">'+[['rad','Rad (scrollen)'],['liste','Liste (Auswahlfenster)']].map(function(o){ return '<button type="button" class="chip" data-a="pickmode" data-v="'+o[0]+'" aria-pressed="'+(S.pick===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät.</p></div>'
     +'<div class="fld"><span class="lbl">Tempo der Räder</span><div class="chips">'+[[60,'Ruhig'],[50,'Normal'],[40,'Schnell']].map(function(o){ return '<button type="button" class="chip" data-a="wi" data-v="'+o[0]+'" aria-pressed="'+(WI()===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Bei „Ruhig“ läuft das Rad bei gleicher Wischbewegung weniger weit.</p></div>';
   else if(pg==='reiter') body=navSettingsHTML();
@@ -2056,17 +2141,17 @@ function settingsSheetHTML(){
   else if(pg==='familie'){
   var rows=PEOPLE.map(function(k){
     var p=S.people[k], ed=S.pedit===k, dl=S.pdel===k;
-    return '<div class="prow" style="--pc:var(--p-'+k+')"><button type="button" class="pcb" data-a="pcolor" data-k="'+k+'" aria-label="Farbe wählen"><i class="pd"></i></button><input type="text" data-p="name" data-k="'+k+'" value="'+esc(p.name)+'" maxlength="24" aria-label="Name"><label><input type="checkbox" data-p="active" data-k="'+k+'"'+(p.active?' checked':'')+'>Anzeigen</label><label title="Schicht-Wecker"><input type="checkbox" data-p="shalarm" data-k="'+k+'"'+(hasShAlarm(k)?' checked':'')+'>⏰</label>'
+    return '<div class="prow" style="--pc:var(--p-'+k+')"><button type="button" class="pcb" data-a="pcolor" data-k="'+k+'" aria-label="Farbe wählen"><i class="pd"></i></button><input type="text" data-p="name" data-k="'+k+'" value="'+esc(p.name)+'" maxlength="24" aria-label="Name"><label><input type="checkbox" data-p="active" data-k="'+k+'"'+(p.active?' checked':'')+'>Anzeigen</label><label title="Schicht-Wecker"><input type="checkbox" data-p="shalarm" data-k="'+k+'"'+(hasShAlarm(k)?' checked':'')+'>⏰</label><label title="Hat noch kein Handy"><input type="checkbox" data-p="nophone" data-k="'+k+'"'+(p.nophone?' checked':'')+'>📵</label>'
       +(PEOPLE.length>1?'<button type="button" class="btn '+(dl?'dng':'')+' pdl" data-a="pdel" data-k="'+k+'" aria-label="Person löschen">'+(dl?'Wirklich?':'🗑')+'</button>':'')+'</div>'
       +(ed?'<div class="pcol">'+PALETTE.map(function(c){ return '<button type="button" class="sw" style="background:'+c+'" data-a="pcol" data-k="'+k+'" data-c="'+c+'" aria-label="Farbe '+c+'"></button>'; }).join('')+'<label class="swc">Eigene<input type="color" data-p="color" data-k="'+k+'" value="'+(p.color||PALETTE[0])+'"></label></div>':'');
   }).join('')+(PEOPLE.length<20?'<button type="button" class="btn" data-a="padd">+ Person hinzufügen</button>':'');
-    body='<div class="fld"><span class="lbl">Familie und Weitere</span>'+rows+'<p class="hint">Tippe auf den farbigen Punkt, um die Farbe zu ändern. Bis zu 20 Personen, zum Beispiel auch Oma oder eine Firma. „Anzeigen“ blendet eine Person aus, ohne sie zu löschen. ⏰ = Schicht-Wecker: Nur diese Personen erscheinen unter „Erinnerungen & Wecker“ bei den Schicht-Weckern.</p></div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
+    body='<div class="fld"><span class="lbl">Familie und Weitere</span>'+rows+'<p class="hint">Tippe auf den farbigen Punkt, um die Farbe zu ändern. Bis zu 20 Personen, zum Beispiel auch Oma oder eine Firma. „Anzeigen“ blendet eine Person aus, ohne sie zu löschen. ⏰ = Schicht-Wecker: Nur diese Personen erscheinen unter „Erinnerungen & Wecker“ bei den Schicht-Weckern. 📵 = Hat noch kein Handy: Diese Person zählt im Chat bei den Punkten „angekommen“ nicht mit.</p></div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
   var lockable=['darst','stil','farben','reiter','wecker','familie'].indexOf(pg)>-1, locked=lockable&&!S.lookEdit;
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
   return shHead(title)+body;
 }
 function shTop(){ var e=document.querySelector('.sheet'); if(e) e.scrollTop=0; }
-function goPage(v){ v=v||''; var cur=S.menuPage||'';
+function goPage(v){ v=v||''; var cur=S.menuPage||''; if(v!=='fahrt'){ S.ft=null; S.ftView=''; }
   if(v===cur){ renderSheet(); shTop(); return; }
   if(v==='') S.mstack=[]; else { S.mstack=S.mstack||[]; S.mstack.push(cur); if(S.mstack.length>12) S.mstack.shift(); }
   S.menuPage=v; renderSheet(); shTop(); }
@@ -2074,6 +2159,8 @@ function goPage(v){ v=v||''; var cur=S.menuPage||'';
 function goBack(){
   if(S.sheet==='help'){ S.sheet='settings'; renderSheet(); shTop(); return true; }
   if(S.sheet==='settings'){
+    if(S.menuPage==='fahrt'&&S.ftView){ S.ftView=''; renderSheet(); return true; }
+    if(S.menuPage==='fahrt'&&S.ft){ S.ft=null; renderSheet(); shTop(); return true; }
     var st=S.mstack||[];
     if(st.length){ S.menuPage=st.pop()||''; renderSheet(); shTop(); return true; }
     if(S.menuPage){ S.menuPage=''; renderSheet(); shTop(); return true; }
@@ -2477,7 +2564,7 @@ document.addEventListener('input',function(e){
   if(el.dataset&&el.dataset.p){
     var k=el.dataset.k;
     if(!S.people[k]) return;
-    if(el.dataset.p==='active') S.people[k].active=el.checked; else if(el.dataset.p==='shalarm') S.people[k].shalarm=el.checked; else if(el.dataset.p==='color'){ S.people[k].color=el.value; applyPeopleColors(); } else S.people[k].name=el.value.slice(0,24);
+    if(el.dataset.p==='active') S.people[k].active=el.checked; else if(el.dataset.p==='shalarm') S.people[k].shalarm=el.checked; else if(el.dataset.p==='nophone') S.people[k].nophone=el.checked; else if(el.dataset.p==='color'){ S.people[k].color=el.value; applyPeopleColors(); } else S.people[k].name=el.value.slice(0,24);
   }
 });
 var wheelT=null;
@@ -2598,7 +2685,7 @@ document.addEventListener('change',function(e){
     if(el.dataset.p==='name'&&!el.value.trim()){ S.people[k].name=(defaultPeople()[k]||{name:'Person'}).name; el.value=S.people[k].name; }
     savePeople();
     renderNotice(); renderCal(); renderShopForm(); renderNotes();
-    if(el.dataset.p==='active'||el.dataset.p==='shalarm') renderSheet();
+    if(el.dataset.p==='active'||el.dataset.p==='shalarm'||el.dataset.p==='nophone') renderSheet();
     return;
   }
   if(el.dataset&&el.dataset.b==='rtime'){ lsSet('bint_'+el.dataset.k,el.value); renderCal(); return; }
