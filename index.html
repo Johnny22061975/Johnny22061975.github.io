@@ -111,6 +111,7 @@ body.glas .card,body.glas .panel{background:color-mix(in srgb,var(--surface) 80%
 .prows{display:grid;grid-auto-rows:18px;row-gap:2px;width:100%;margin-top:2px}.pr{display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap}.pr .sh{flex:none;min-width:17px;height:17px;padding:0 2px;font-size:10px}.pr .me{flex:none}.pr .me b{display:inline;max-width:70px;overflow:hidden;text-overflow:ellipsis}.prb{gap:2px}.pb{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bc);flex:none}.day .prows{justify-items:center}.day .pr{justify-content:center}
 .sh.swp{background-image:repeating-linear-gradient(135deg,var(--pc) 0 3px,color-mix(in srgb,var(--pc) 45%,#fff) 3px 6px)!important;color:#1b1f26!important;text-shadow:0 0 2px #fff}
 .ftc{display:grid;gap:6px;padding:12px;border:1.5px solid var(--line2);border-radius:14px;margin-bottom:10px}.ftc h3{margin:0;font-size:16px;display:flex;gap:8px;align-items:center}.ftt{display:flex;flex-wrap:wrap;gap:6px;font-size:14px}.ftt b{font-weight:700;color:var(--ink-2);font-size:12px;width:100%}.ftt span{padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--ink) 8%,transparent);font-variant-numeric:tabular-nums}.ftph{display:flex;gap:8px;flex-wrap:wrap}.ftph button{padding:0;border:0;background:none;cursor:pointer;position:relative}.ftph img{width:92px;height:70px;object-fit:cover;border-radius:8px;display:block}.ftbig{width:100%;border-radius:10px;display:block}
+.ftday{display:block;width:100%;text-align:left;font:600 12px var(--f-body);color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,transparent);border:0;border-radius:8px;padding:5px 7px;margin:2px 0 4px;cursor:pointer}.ftday small{font-weight:400;color:var(--ink-2)}.ftdx{display:grid;gap:8px;font-size:12px;margin-bottom:6px}.ftdx .ftt{font-size:12px}.ftdx .ftt span.on{background:var(--ink);color:var(--bg);font-weight:700}
 .hrt{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}.hrt td,.hrt th{padding:5px 4px;border-top:1px solid var(--line);text-align:right}.hrt td:first-child,.hrt th:first-child{text-align:left}.hrin{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:400px){.pb{width:7px;height:7px}.pr .sh{min-width:15px;height:15px;font-size:9px}.prows{grid-auto-rows:16px}}
 .msh .sh.ph,.wsh .sh.ph{visibility:hidden}.msh{flex-direction:column;align-items:flex-start;flex-wrap:nowrap}body.shrow .msh{flex-direction:row;flex-wrap:wrap}body.shrow .wsh{flex-direction:row;flex-wrap:wrap;justify-content:center}
@@ -1360,7 +1361,7 @@ function renderSchool(){ var box=$('#schoolBox'); if(!box) return; var kids=scho
   else h+='<div class="sgrid">'+[0,1,2,3,4,5].filter(function(wd){ return wd<5||days[wd]; }).map(function(wd){ var L=[]; (days[wd]||[]).forEach(function(ev){ if(Array.isArray(ev.lessons)&&ev.lessons.length) ev.lessons.forEach(function(l,li){ L.push({start:l.start,end:l.end,t:l.subject,r:l.room,id:ev.id,li:li}); }); else L.push({start:ev.start,end:ev.end,t:ev.title,r:'',id:ev.id,li:-1}); });
       L.sort(function(a,b){ return (a.start||'')<(b.start||'')?-1:1; });
       var isT=weekday(today)===wd;
-      return '<div class="sday'+(isT?' td':'')+'"><span class="sdh">'+['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][wd]+'</span>'+(L.length?L.map(function(l){ return '<button type="button" class="sl" data-a="sedit" data-id="'+esc(l.id)+'" data-li="'+l.li+'" data-wd="'+wd+'"><time>'+esc(l.start||'')+(l.end?'–'+esc(l.end):'')+'</time><b>'+esc(l.t||'')+'</b>'+(l.r?'<small>'+esc(l.r)+'</small>':'')+'</button>'; }).join(''):'<span class="hint">frei</span>')+'</div>'; }).join('')+'</div><p class="hint">Eine Stunde antippen: ändern oder löschen, nur für einen Tag (Ausfall, Vertretung) oder dauerhaft (z. B. Kurs abgewählt).</p>';
+      return '<div class="sday'+(isT?' td':'')+'"><span class="sdh">'+['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][wd]+'</span>'+ftDayHTML(k,wd,L)+(L.length?L.map(function(l){ return '<button type="button" class="sl" data-a="sedit" data-id="'+esc(l.id)+'" data-li="'+l.li+'" data-wd="'+wd+'"><time>'+esc(l.start||'')+(l.end?'–'+esc(l.end):'')+'</time><b>'+esc(l.t||'')+'</b>'+(l.r?'<small>'+esc(l.r)+'</small>':'')+'</button>'; }).join(''):'<span class="hint">frei</span>')+'</div>'; }).join('')+'</div><p class="hint">Eine Stunde antippen: ändern oder löschen, nur für einen Tag (Ausfall, Vertretung) oder dauerhaft (z. B. Kurs abgewählt).</p>';
   h+='</div>';
   var up=[], seen={};
   for(var i=0;i<90&&up.length<12;i++){ var ds=addDays(today,i);
@@ -2042,7 +2043,7 @@ function shHead(title,root){
 var FTT={bus:['🚌','Bus'],sbahn:['🚈','S-Bahn'],zug:['🚆','Zug'],tram:['🚋','Straßenbahn']};
 function ftList(){ var r=(S.settingsRows||{}).fahrplan; return (r&&Array.isArray(r.list))?r.list:[]; }
 function ftTimes(v){ return String(v||'').split(/[,;\s]+/).map(function(x){ var m=/^(\d{1,2})[:.]?(\d{2})$/.exec(x.trim()); return m&&+m[1]<24&&+m[2]<60?pad(+m[1])+':'+m[2]:''; }).filter(Boolean).filter(function(x,i,a){ return a.indexOf(x)===i; }).sort(); }
-function ftGrab(){ var f=S.ft; if(!f) return; [['line','ftLine'],['stop','ftStop'],['hin','ftHin'],['rueck','ftRueck'],['days','ftDays'],['note','ftNote']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
+function ftGrab(){ var f=S.ft; if(!f) return; [['line','ftLine'],['stop','ftStop'],['hin','ftHin'],['rueck','ftRueck'],['days','ftDays'],['note','ftNote'],['trip','ftTrip']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
 function ftHTML(){
   if(S.ftView){ var ph=(S.citems||[]).filter(function(x){ return x.id===S.ftView; })[0]; if(ph) return '<img class="ftbig" src="'+esc(ph.data)+'" alt="Foto vom Fahrplan"><div class="btns"><button type="button" class="btn" data-a="ftviewx">Schließen</button></div>'; S.ftView=''; }
   var f=S.ft;
@@ -2054,6 +2055,7 @@ function ftHTML(){
       +'<div class="fld"><label class="lbl" for="ftHin">Hinfahrt: Abfahrt hier</label><input type="text" id="ftHin" inputmode="numeric" value="'+esc(f.hin||'')+'" placeholder="z. B. 7:12, 7:40"></div>'
       +'<div class="fld"><label class="lbl" for="ftRueck">Rückfahrt: Ankunft hier</label><input type="text" id="ftRueck" inputmode="numeric" value="'+esc(f.rueck||'')+'" placeholder="z. B. 12:35, 13:20"></div>'
       +'<p class="hint">Mehrere Uhrzeiten mit Komma trennen.</p>'
+      +'<div class="fld"><label class="lbl" for="ftTrip">Fahrzeit bis zur Schule bzw. zum Ziel (Min.)</label><input type="number" id="ftTrip" min="0" max="180" inputmode="numeric" value="'+esc(f.trip!=null&&f.trip!==''?f.trip:15)+'"><p class="hint">Damit sucht der Stundenplan den passenden Bus aus.</p></div>'
       +'<div class="fld"><label class="lbl" for="ftNote">Notiz</label><textarea id="ftNote" rows="2" maxlength="300" placeholder="z. B. Freitags früher, nur an Schultagen">'+esc(f.note||'')+'</textarea></div>'
       +'<div class="fld"><span class="lbl">Fotos (Aushang, Fahrplan)</span>'+(f.id?'<div class="ftph">'+phs.map(function(x){ return '<button type="button" data-a="ftview" data-id="'+esc(x.id)+'" aria-label="Foto groß ansehen"><img src="'+esc(x.data)+'" alt=""></button>'+(S.ftPhDel===x.id?'<button type="button" class="btn sm dng" data-a="ftphdel" data-id="'+esc(x.id)+'">Wirklich löschen?</button>':'<button type="button" class="btn sm" data-a="ftphdel" data-id="'+esc(x.id)+'" aria-label="Foto löschen">🗑</button>'); }).join('')+'</div><label class="btn sm filebtn" style="margin-top:8px">'+(S.ftBusy?'Wird geladen …':'📷 Foto aufnehmen oder wählen')+'<input type="file" class="ftphoto" accept="image/*"></label>':'<p class="hint">Fotos kannst du hinzufügen, sobald der Eintrag gespeichert ist.</p>')+'</div>'
       +(f.msg?'<p class="hint err">'+esc(f.msg)+'</p>':'')
@@ -2069,18 +2071,31 @@ function ftHTML(){
         +(phs.length?'<div class="ftph">'+phs.map(function(p){ return '<button type="button" data-a="ftview" data-id="'+esc(p.id)+'" aria-label="Foto groß ansehen"><img src="'+esc(p.data)+'" alt=""></button>'; }).join('')+'</div>':'')+'</div>'; }).join('')
     :'<p class="hint">Noch keine Fahrpläne. Lege für jede Haltestelle einen Eintrag an, zum Beispiel den Schulbus mit beiden Haltestellen.</p>')
     +'<div class="btns"><button type="button" class="btn pri" data-a="ftnew">+ Haltestelle hinzufügen</button></div>'; }
+function hm(t){ var m=/^(\d{1,2}):(\d{2})$/.exec(t||''); return m?(+m[1])*60+(+m[2]):null; }
+function ftForKid(k){ return ftList().filter(function(x){ return (x.who||[]).indexOf(k)>-1; }); }
+function ftPick(k,first,last){ var E=ftForKid(k), hin=null, back=null, a=hm(first), b=hm(last);
+  E.forEach(function(x){ var tr=x.trip!=null?+x.trip:15;
+    if(a!==null) (x.hin||[]).forEach(function(t){ var m=hm(t); if(m!==null&&m+tr<=a&&(!hin||m>hm(hin.t))) hin={t:t,x:x}; });
+    if(b!==null) (x.rueck||[]).forEach(function(t){ var m=hm(t); if(m!==null&&m-tr>=b&&(!back||m<hm(back.t))) back={t:t,x:x}; }); });
+  return {hin:hin,back:back,n:E.length}; }
+function ftDayHTML(k,wd,L){ if(!ftForKid(k).length||!L.length) return ''; var st=L.map(function(l){ return l.start; }).filter(Boolean).sort(), en=L.map(function(l){ return l.end||l.start; }).filter(Boolean).sort();
+  var p=ftPick(k,st[0],en[en.length-1]), lab=function(o){ return o?esc(o.t)+(ftForKid(k).length>1?' <small>'+esc(o.x.stop)+'</small>':''):'–'; };
+  var h='<button type="button" class="ftday" data-a="ftday" data-wd="'+wd+'" aria-expanded="'+(S.ftDay===wd)+'">🚌 hin '+lab(p.hin)+' · zurück '+lab(p.back)+'</button>';
+  if(S.ftDay===wd) h+='<div class="ftdx">'+ftForKid(k).map(function(x){ var t=FTT[x.type]||FTT.bus; return '<div><b>'+t[0]+' '+esc((x.line?x.line+' · ':'')+x.stop)+'</b><div class="ftt"><b>Hin</b>'+(x.hin||[]).map(function(z){ return '<span'+(p.hin&&p.hin.x===x&&p.hin.t===z?' class="on"':'')+'>'+esc(z)+'</span>'; }).join('')+'</div><div class="ftt"><b>Zurück</b>'+(x.rueck||[]).map(function(z){ return '<span'+(p.back&&p.back.x===x&&p.back.t===z?' class="on"':'')+'>'+esc(z)+'</span>'; }).join('')+'</div></div>'; }).join('')+'</div>';
+  return h; }
 function ftSaveList(L){ var o={list:L}; S.settingsRows=S.settingsRows||{}; S.settingsRows.fahrplan=o; return saveSettings('fahrplan',o); }
 function ftClick(a,t){
   if(a==='ftnew'){ S.ft={type:'bus',who:[],line:'',stop:'',hin:'',rueck:'',days:'',note:''}; renderSheet(); shTop(); return true; }
-  if(a==='ftedit'){ var x=ftList().filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.ft={id:x.id,type:x.type||'bus',who:(x.who||[]).slice(),line:x.line||'',stop:x.stop||'',hin:(x.hin||[]).join(', '),rueck:(x.rueck||[]).join(', '),days:x.days||'',note:x.note||''}; renderSheet(); shTop(); return true; }
+  if(a==='ftedit'){ var x=ftList().filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.ft={id:x.id,type:x.type||'bus',who:(x.who||[]).slice(),line:x.line||'',stop:x.stop||'',hin:(x.hin||[]).join(', '),rueck:(x.rueck||[]).join(', '),days:x.days||'',note:x.note||'',trip:x.trip!=null?x.trip:15}; renderSheet(); shTop(); return true; }
   if(a==='fttype'){ ftGrab(); S.ft.type=t.dataset.v; renderSheet(); return true; }
   if(a==='ftwho'){ ftGrab(); var w=S.ft.who, i=w.indexOf(t.dataset.k); if(i>-1) w.splice(i,1); else w.push(t.dataset.k); renderSheet(); return true; }
   if(a==='ftsave'){ ftGrab(); var f=S.ft; if(!String(f.stop||'').trim()){ f.msg='Bitte die Haltestelle eintragen.'; renderSheet(); return true; }
-    var rec={id:f.id||S.store.newId(),type:f.type,line:String(f.line||'').trim().slice(0,20),stop:String(f.stop).trim().slice(0,60),days:String(f.days||'').trim().slice(0,30),who:f.who.slice(),hin:ftTimes(f.hin),rueck:ftTimes(f.rueck),note:String(f.note||'').trim().slice(0,300),by:S.me||'',ts:Date.now()};
+    var rec={id:f.id||S.store.newId(),type:f.type,line:String(f.line||'').trim().slice(0,20),stop:String(f.stop).trim().slice(0,60),days:String(f.days||'').trim().slice(0,30),who:f.who.slice(),hin:ftTimes(f.hin),rueck:ftTimes(f.rueck),note:String(f.note||'').trim().slice(0,300),trip:Math.max(0,Math.min(180,parseInt(f.trip,10)||0)),by:S.me||'',ts:Date.now()};
     var L=ftList().slice(), ix=-1; L.forEach(function(y,i){ if(y.id===rec.id) ix=i; }); if(ix>-1) L[ix]=rec; else L.push(rec);
     ftSaveList(L); if(f.id){ S.ft=null; } else { S.ft.id=rec.id; S.ft.msg=''; S.ft.hin=rec.hin.join(', '); S.ft.rueck=rec.rueck.join(', '); toast('Gespeichert. Jetzt kannst du Fotos hinzufügen.'); } renderSheet(); return true; }
   if(a==='ftdel'){ var f2=S.ft; if(!f2.del){ ftGrab(); f2.del=true; renderSheet(); return true; } ntPhotos(f2.id).forEach(function(x){ safe(function(){ return S.store.remove('citems',x.id); }); }); ftSaveList(ftList().filter(function(y){ return y.id!==f2.id; })); S.ft=null; renderSheet(); shTop(); return true; }
   if(a==='ftview'){ if(S.ft) ftGrab(); S.ftView=t.dataset.id; renderSheet(); shTop(); return true; }
+  if(a==='ftday'){ var wd=+t.dataset.wd; S.ftDay=S.ftDay===wd?null:wd; renderSchool(); return true; }
   if(a==='ftviewx'){ S.ftView=''; renderSheet(); return true; }
   if(a==='ftphdel'){ ftGrab(); var pid=t.dataset.id; if(S.ftPhDel!==pid){ S.ftPhDel=pid; renderSheet(); return true; } S.ftPhDel=''; safe(function(){ return S.store.remove('citems',pid); }).then(function(){ setTimeout(renderSheet,200); }); return true; }
   return false; }
