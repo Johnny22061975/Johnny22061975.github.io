@@ -2083,18 +2083,22 @@ function ftDayHTML(k,wd,L){ if(!ftForKid(k).length||!L.length) return ''; var st
   var h='<button type="button" class="ftday" data-a="ftday" data-wd="'+wd+'" aria-expanded="'+(S.ftDay===wd)+'">🚌 hin '+lab(p.hin)+' · zurück '+lab(p.back)+'</button>';
   if(S.ftDay===wd) h+='<div class="ftdx">'+ftForKid(k).map(function(x){ var t=FTT[x.type]||FTT.bus; return '<div><b>'+t[0]+' '+esc((x.line?x.line+' · ':'')+x.stop)+'</b><div class="ftt"><b>Hin</b>'+(x.hin||[]).map(function(z){ return '<span'+(p.hin&&p.hin.x===x&&p.hin.t===z?' class="on"':'')+'>'+esc(z)+'</span>'; }).join('')+'</div><div class="ftt"><b>Zurück</b>'+(x.rueck||[]).map(function(z){ return '<span'+(p.back&&p.back.x===x&&p.back.t===z?' class="on"':'')+'>'+esc(z)+'</span>'; }).join('')+'</div></div>'; }).join('')+'</div>';
   return h; }
-function ftScanHTML(){ var sc=S.ftScan, h='<div class="fld"><label class="btn sm filebtn">'+(sc&&sc.busy?'Wird ausgelesen …':'🔍 Fahrplan per Foto auslesen')+'<input type="file" class="ftscan" accept="image/*"'+(sc&&sc.busy?' disabled':'')+'></label>';
+function ftScanHTML(){ var sc=S.ftScan, h='<div class="fld"><label class="btn sm filebtn">'+(sc&&sc.busy?'Wird ausgelesen …':'🔍 Fahrplan per Foto oder PDF auslesen')+'<input type="file" class="ftscan" accept="image/*,application/pdf,.pdf"'+(sc&&sc.busy?' disabled':'')+'></label>';
   if(sc&&sc.msg) h+='<p class="hint'+(sc.err?' err':'')+'">'+esc(sc.msg)+'</p>';
   if(sc&&sc.dirs&&sc.dirs.length) h+=sc.dirs.map(function(d,i){ return '<div class="ftc" style="margin:8px 0 0"><b>'+esc((d.line?'Linie '+d.line+' · ':'')+'Richtung '+(d.to||'?'))+'</b>'+(d.days?'<small>'+esc(d.days)+'</small>':'')+'<div class="ftt">'+d.times.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div><div class="btns"><button type="button" class="btn sm'+(d.used==='hin'?' pri':'')+'" data-a="ftuse" data-i="'+i+'" data-v="hin">Als Hinfahrt</button><button type="button" class="btn sm'+(d.used==='rueck'?' pri':'')+'" data-a="ftuse" data-i="'+i+'" data-v="rueck">Als Rückfahrt</button></div></div>'; }).join('')+'<div class="btns"><button type="button" class="btn sm" data-a="ftscanx">Ergebnis ausblenden</button></div>';
-  return h+'<p class="hint">Fotografiere den Aushang an der Haltestelle. Ist oben eine Linie eingetragen, liest die App nur diese Linie aus. Danach wählst du, welche Richtung Hin- und welche Rückfahrt ist.</p></div>'; }
+  return h+'<p class="hint">Fotografiere den Aushang an der Haltestelle oder wähle ein Fahrplan-PDF (z. B. von der Schul-Webseite). Bei einem PDF mit vielen Haltestellen vorher oben die Haltestelle eintragen. Ist oben eine Linie eingetragen, liest die App nur diese Linie aus. Danach wählst du, welche Richtung Hin- und welche Rückfahrt ist.</p></div>'; }
 function ftScanRun(file){ var f=S.ft; if(!f) return; ftGrab(); var sc=S.ftScan={busy:true,msg:'',dirs:[]}; renderSheet();
   var fail=function(m){ if(S.ftScan!==sc) return; sc.busy=false; sc.err=true; sc.msg=m; renderSheet(); };
   if(!(S.sample&&typeof S.sample.json==='function')) return fail('Das Auslesen von Fotos geht nur in der angemeldeten App.');
+  var isPdf=/pdf$/i.test(file.type||'')||/\.pdf$/i.test(file.name||'');
+  if(isPdf){ if(file.size>15000000) return fail('Das PDF ist zu groß (höchstens 15 MB).'); return ftScanSend(file,true,sc,fail); }
   var fr=new FileReader(); fr.onerror=function(){ fail('Das Foto konnte nicht gelesen werden.'); };
   fr.onload=function(){ var im=new Image(); im.onerror=function(){ fail('Das ist kein lesbares Bild.'); }; im.onload=function(){ var k=Math.min(1,2400/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-    c.toBlob(function(blob){ if(!blob) return fail('Das Foto konnte nicht verarbeitet werden.');
+    c.toBlob(function(blob){ if(!blob) return fail('Das Foto konnte nicht verarbeitet werden.'); ftScanSend(blob,false,sc,fail,file); },'image/jpeg',0.85); }; im.src=fr.result; };
+  fr.readAsDataURL(file); }
+function ftScanSend(blob,isPdf,sc,fail,origFile){ var f=S.ft; if(!f) return; var file=origFile;
       var line=String(f.line||'').trim();
-      var prompt='Du liest das Foto eines Fahrplan-Aushangs an einer Bus- oder Bahnhaltestelle (Deutschland).\n'
+      var prompt=(isPdf?'Du liest ein Fahrplan-PDF (Deutschland). Das kann ein Aushang einer Haltestelle oder ein Linienfahrplan mit vielen Haltestellen als Zeilen und Fahrten als Spalten sein.\n'+(f.stop?'Ist es ein Linienfahrplan, nimm die Zeiten in der Zeile der Haltestelle "'+String(f.stop).slice(0,60)+'" (auch ähnliche Schreibweise).\n':'Ist es ein Linienfahrplan, nimm die Zeiten der ersten Haltestelle und nenne in "note" die Haltestellen, die es gibt.\n'):'Du liest das Foto eines Fahrplan-Aushangs an einer Bus- oder Bahnhaltestelle (Deutschland).\n')
         +(line?'Lies NUR die Linie "'+line+'" aus und ignoriere alle anderen Linien.\n':'Lies alle Linien aus.\n')
         +(f.stop?'Die Haltestelle heißt vermutlich "'+String(f.stop).slice(0,60)+'".\n':'')
         +'Gib pro Linie und Fahrtrichtung die Abfahrtszeiten an dieser Haltestelle an. Gibt es getrennte Spalten für Tage (z. B. Montag–Freitag, Schultage, Ferien, Samstag, Sonntag), mach dafür getrennte Einträge.\n'
@@ -2105,9 +2109,8 @@ function ftScanRun(file){ var f=S.ft; if(!f) return; ftGrab(); var sc=S.ftScan={
         var dirs=((r&&Array.isArray(r.directions))?r.directions:[]).slice(0,12).map(function(d){ return {line:String((d&&d.line)||'').slice(0,20),to:String((d&&d.to)||'').slice(0,60),days:String((d&&d.days)||'').slice(0,40),times:ftTimes(((d&&Array.isArray(d.times))?d.times:[]).slice(0,80).join(','))}; }).filter(function(d){ return d.times.length&&(!line||!d.line||d.line.replace(/\s/g,'').toLowerCase()===line.replace(/\s/g,'').toLowerCase()); });
         sc.dirs=dirs; if(r&&r.stop&&S.ft&&!String(S.ft.stop||'').trim()) S.ft.stop=String(r.stop).slice(0,60); if(S.ft&&!line&&dirs.length===1&&dirs[0].line) S.ft.line=dirs[0].line;
         sc.err=!dirs.length; sc.msg=dirs.length?((r.note&&String(r.note).trim())?String(r.note).trim().slice(0,200):'Gefunden. Tippe bei jeder Richtung, ob sie Hin- oder Rückfahrt ist.'):'Auf dem Foto habe ich '+(line?'keine Zeiten für Linie '+line:'keine Abfahrtszeiten')+' erkannt. Versuch ein schärferes, gerade fotografiertes Bild.'; renderSheet();
-        if(S.ft&&S.ft.id){ var fid=S.ft.id; ntImg(file,function(d2){ if(!d2) return; var now=Date.now(); safe(function(){ return S.store.set('citems',S.store.newId(),{kind:'photo',topic:fid,data:d2,by:S.me||'',ts:now,ct:now}); }); }); }
-      },function(e){ var c=e&&e.code; fail(c==='offline'?'Für das Auslesen braucht die App Internet.':c==='rate_limited'?'Gerade zu viele Anfragen. Versuch es später nochmal.':c==='images_unavailable'?'Fotos auslesen geht hier gerade nicht.':'Das Auslesen hat nicht geklappt. Bitte nochmal versuchen.'); }); },'image/jpeg',0.85); }; im.src=fr.result; };
-  fr.readAsDataURL(file); }
+        if(!isPdf&&file&&S.ft&&S.ft.id){ var fid=S.ft.id; ntImg(file,function(d2){ if(!d2) return; var now=Date.now(); safe(function(){ return S.store.set('citems',S.store.newId(),{kind:'photo',topic:fid,data:d2,by:S.me||'',ts:now,ct:now}); }); }); }
+      },function(e){ var c=e&&e.code; fail(c==='offline'?'Für das Auslesen braucht die App Internet.':c==='rate_limited'?'Gerade zu viele Anfragen. Versuch es später nochmal.':c==='images_unavailable'?'Fotos auslesen geht hier gerade nicht.':c==='ai_disabled'?'Die Auswertung ist in Firebase nicht eingeschaltet (AI Logic).':c==='invalid_json'?'Die Auswertung hat eine unlesbare Antwort geliefert. Bitte nochmal versuchen, am besten mit einem Ausschnitt nur deiner Linie.':'Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(0,140)+').'); }); }
 function ftSaveList(L){ var o={list:L}; S.settingsRows=S.settingsRows||{}; S.settingsRows.fahrplan=o; return saveSettings('fahrplan',o); }
 function ftClick(a,t){
   if(a==='ftnew'){ S.ftScan=null; S.ft={type:'bus',who:[],line:'',stop:'',hin:'',rueck:'',days:'',note:''}; renderSheet(); shTop(); return true; }
@@ -2155,7 +2158,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='1.11.2026 · 16:10';
+var APPVER='1.11.2026 · 16:30';
 function settingsSheetHTML(){
   var pg=S.menuPage||'';
   if(!pg) return shHead('Menü',true)

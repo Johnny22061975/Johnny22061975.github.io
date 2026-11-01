@@ -56,7 +56,7 @@ try {
         throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: s };
       }
       let t = r.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-      try { return JSON.parse(t); } catch (e) { throw { code: 'invalid_json' }; }
+      try { return JSON.parse(t); } catch (e) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a > -1 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (x) {} } throw { code: 'invalid_json', message: t.slice(0, 120) }; }
     }
   };
   // Benachrichtigungen: Gerät bei Firebase Cloud Messaging anmelden
