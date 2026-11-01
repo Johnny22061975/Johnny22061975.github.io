@@ -706,11 +706,11 @@ function applySettings(rows){
     if(lst&&lst.length){
       var nd={};
       lst.forEach(function(k){ var v=r[k], dv=d[k]||{name:'Person',active:true};
-        nd[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):dv.name,active:v.active!==undefined?!!v.active:dv.active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined,rem:remClean(v.rem)}; });
+        nd[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):dv.name,active:v.active!==undefined?!!v.active:dv.active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined,nophone:!!v.nophone,rem:remClean(v.rem)}; });
       d=nd; PEOPLE.length=0; lst.forEach(function(k){ PEOPLE.push(k); });
     } else {
       PEOPLE.length=0; Object.keys(d).forEach(function(k){ PEOPLE.push(k); });
-      PEOPLE.forEach(function(k){ var v=r[k]; if(v&&typeof v==='object'){ d[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):d[k].name,active:v.active!==undefined?!!v.active:d[k].active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined,rem:remClean(v.rem)}; } });
+      PEOPLE.forEach(function(k){ var v=r[k]; if(v&&typeof v==='object'){ d[k]={name:(typeof v.name==='string'&&v.name.trim())?v.name.trim().slice(0,24):d[k].name,active:v.active!==undefined?!!v.active:d[k].active,color:/^#[0-9a-fA-F]{6}$/.test(v.color||'')?v.color:'',shalarm:v.shalarm!==undefined?!!v.shalarm:undefined,nophone:!!v.nophone,rem:remClean(v.rem)}; } });
     }
   }
   S.people=d; if(S.me&&PEOPLE.indexOf(S.me)<0) S.me=null; applyPeopleColors();
