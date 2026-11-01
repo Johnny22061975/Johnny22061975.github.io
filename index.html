@@ -1183,7 +1183,9 @@ function renderShop(){
   var views=[['list','🛒 Liste']].concat(hhOn('vorrat')?[['vorrat','🥫 Vorräte']]:[]).concat(hhOn('kasse')?[['kasse','💶 Kasse']]:[]);
   if(!views.some(function(v){ return v[0]===S.shopView; })) S.shopView='list';
   var sg=$('#shopSeg'), hb=$('#shopHH'), mn=$('#shopMain');
-  if(sg) sg.innerHTML=views.length>1?'<div class="seg segtop" role="group" style="margin-bottom:12px">'+views.map(function(v){ return '<button type="button" data-a="shopv" data-v="'+v[0]+'" aria-pressed="'+(S.shopView===v[0])+'">'+v[1]+'</button>'; }).join('')+'</div>':'';
+  if(sg) sg.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">'+(views.length>1?'<div class="seg segtop" role="group" style="flex:1;margin:0">'+views.map(function(v){ return '<button type="button" data-a="shopv" data-v="'+v[0]+'" aria-pressed="'+(S.shopView===v[0])+'" style="white-space:nowrap;font-size:14px;padding-left:4px;padding-right:4px">'+v[1]+'</button>'; }).join('')+'</div>':'<span style="flex:1"></span>')
+    +'<button type="button" class="icon-btn" data-a="shopcfg" aria-expanded="'+!!S.shopCfg+'" aria-label="Einkauf einstellen" title="Vorräte und Kasse ein- oder ausschalten">⚙️</button></div>'
+    +(S.shopCfg?'<div class="panel" style="margin-bottom:12px"><b class="bpt">Im Einkauf zeigen</b>'+[['vorrat','🥫 Vorräte'],['kasse','💶 Haushaltskasse']].map(function(o){ return '<label style="display:flex;gap:10px;align-items:center;margin:8px 0"><input type="checkbox" data-hhsw="'+o[0]+'"'+(hhOn(o[0])?' checked':'')+' style="width:22px;height:22px">'+o[1]+'</label>'; }).join('')+'<p class="hint">Ausgeschaltet bleibt nur die normale Einkaufsliste. Gilt für dieses Gerät.</p></div>':'');
   if(hb&&mn){ var hv=S.shopView!=='list'; mn.hidden=hv; hb.hidden=!hv; if(hv) hb.innerHTML='<div class="panel">'+(S.shopView==='kasse'?kasseHTML():vorratHTML())+'</div>'; }
   renderShopForm();
   var items=S.shop.slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
@@ -2182,7 +2184,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='1.11.2026 · 22:25';
+var APPVER='1.11.2026 · 22:35';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2279,6 +2281,7 @@ function fristNotice(){ return setList('fristen').filter(function(x){ var d=fris
 
 // ---------- Klicks für Kasse, Vorräte, Fristen ----------
 function hhClick(a,t){ var L,i,x;
+  if(a==='shopcfg'){ S.shopCfg=!S.shopCfg; renderShop(); return true; }
   if(a==='shopv'){ S.shopView=t.dataset.v; S.kf=null; S.vf=null; S.kScan=null; renderShop(); window.scrollTo(0,0); return true; }
   if(a==='kym'){ var ym=S.kYm||ymd(new Date()).slice(0,7), d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+(+t.dataset.v),1); S.kYm=d.getFullYear()+'-'+pad(d.getMonth()+1); hhRender(); return true; }
   if(a==='knew'||a==='knewscan'){ S.kScan=null; S.kf={cat:'lebensmittel',date:ymd(new Date())}; hhRender(); shTop(); if(a==='knewscan') setTimeout(function(){ var e=document.querySelector('.kscan'); if(e) e.click(); },50); return true; }
@@ -2305,7 +2308,7 @@ function hhClick(a,t){ var L,i,x;
   if(a==='fdel'){ if(!S.ff.del){ fGrab(); S.ff.del=true; hhRender(); return true; } var fid=S.ff.id; setListSave('fristen',setList('fristen').filter(function(y){ return y.id!==fid; })); S.ff=null; hhRender(); renderNotice(); return true; }
   if(a==='fopen'){ if(S.sheet!=='settings') openSettings(); goPage('fristen'); return true; }
   return false; }
-document.addEventListener('click',function(e){ var t=e.target.closest('[data-a]'); if(!t||!/^((k|v|f)(ym|new|newscan|edit|cat|save|del|qty|shop|title|open)|shopv)$/.test(t.dataset.a)) return; if(hhClick(t.dataset.a,t)){ e.stopImmediatePropagation(); try{ navSync(); }catch(x){} } },true);
+document.addEventListener('click',function(e){ var t=e.target.closest('[data-a]'); if(!t||!/^((k|v|f)(ym|new|newscan|edit|cat|save|del|qty|shop|title|open)|shopv|shopcfg)$/.test(t.dataset.a)) return; if(hhClick(t.dataset.a,t)){ e.stopImmediatePropagation(); try{ navSync(); }catch(x){} } },true);
 document.addEventListener('change',function(e){ var el=e.target; if(el&&el.dataset&&el.dataset.hhsw){ e.stopImmediatePropagation(); lsSet('hh_'+el.dataset.hhsw,el.checked?'1':'0'); renderShop(); renderSheet(); return; } if(!el||!el.classList||!el.classList.contains('kscan')) return; e.stopImmediatePropagation(); var f=el.files&&el.files[0]; el.value=''; if(f) kScanRun(f); },true);
 function settingsSheetHTML(){
   var pg=S.menuPage||'';
@@ -2332,7 +2335,7 @@ function settingsSheetHTML(){
   else if(pg==='stunden') body=hrHTML();
   if(pg==='darst'||pg==='zeit') body+='<div class="fld"><span class="lbl">Datum und Uhrzeit auswählen</span><div class="chips">'+[['rad','Rad (scrollen)'],['liste','Liste (Auswahlfenster)']].map(function(o){ return '<button type="button" class="chip" data-a="pickmode" data-v="'+o[0]+'" aria-pressed="'+(S.pick===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät.</p></div>'
     +'<div class="fld"><span class="lbl">Tempo der Räder</span><div class="chips">'+[[60,'Ruhig'],[50,'Normal'],[40,'Schnell']].map(function(o){ return '<button type="button" class="chip" data-a="wi" data-v="'+o[0]+'" aria-pressed="'+(WI()===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Bei „Ruhig“ läuft das Rad bei gleicher Wischbewegung weniger weit.</p></div>';
-  else if(pg==='reiter') body=navSettingsHTML()+'<div class="fld"><span class="lbl">Im Reiter „Einkauf“ zeigen</span>'+[['vorrat','🥫 Vorräte'],['kasse','💶 Haushaltskasse']].map(function(o){ return '<label style="display:flex;gap:10px;align-items:center;margin:6px 0"><input type="checkbox" data-hhsw="'+o[0]+'"'+(hhOn(o[0])?' checked':'')+' style="width:22px;height:22px">'+o[1]+'</label>'; }).join('')+'<p class="hint">Ausgeschaltet bleibt im Reiter nur die normale Einkaufsliste. Gilt für dieses Gerät.</p></div>';
+  else if(pg==='reiter') body=navSettingsHTML();
   else if(pg==='ichbin') body='<div class="fld"><span class="lbl">Ich bin</span><div class="chips">'+PEOPLE.filter(function(k){ return S.people[k].active; }).map(function(k){
       return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="setme" data-k="'+k+'" aria-pressed="'+(S.me===k)+'"><i class="pd"></i>'+esc(pname(k))+'</button>';
     }).join('')+'</div></div>';
