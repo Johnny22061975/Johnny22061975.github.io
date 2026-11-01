@@ -1096,7 +1096,7 @@ function renderCal(){ try{ shcApply(); }catch(e){}
       +(mine.length?mine.map(function(ev){ return evCard(ev,k); }).join(''):'<div class="empty-col">'+(S.loaded.events?'Nichts geplant':'Lädt …')+'</div>')+'</div>';
   }).join('');
 }
-var BTIMES=(function(){ var a=[]; for(var h=12;h<=23;h++) for(var m=0;m<60;m+=15) a.push((h<10?'0':'')+h+':'+(m<10?'0':'')+m); return a; })();
+var BTIMES=(function(){ var a=[]; for(var h=12;h<=23;h++) for(var m=0;m<60;m++) a.push((h<10?'0':'')+h+':'+(m<10?'0':'')+m); return a; })();
 function binTime(k){ var v=lsGet('bint_'+k); return (v&&/^\d{2}:\d{2}$/.test(v))?v:'18:00'; }
 function nowHM(){ var d=new Date(); return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes(); }
 function binCfg(k){ return (S.binDraft&&S.binDraft[k])||S.muell[k]; }
@@ -1535,7 +1535,7 @@ function settleDate(w){
 function timeSelects(key,val,cmp){
   var p=/^\d{2}:\d{2}$/.test(val||'')?val.split(':'):null, hs=[], ms=[], i;
   for(i=0;i<24;i++) hs.push(pad(i));
-  for(i=0;i<60;i+=5) ms.push(pad(i));
+  for(i=0;i<60;i++) ms.push(pad(i));
   if(p&&ms.indexOf(p[1])<0){ ms.push(p[1]); ms.sort(); }
   if(S.pick==='liste'){
     return '<div class="row2t" data-tw="'+key+'" role="group">'
@@ -1828,7 +1828,7 @@ function loadPlanForm(k){
 }
 function timeOpts(f,i,cur){
   var h='<select data-pr="'+f+'" data-i="'+i+'" aria-label="'+(f==='a'?'Beginn':'Ende')+'"><option value="">--:--</option>', x, hh, mm;
-  for(hh=0;hh<24;hh++) for(mm=0;mm<60;mm+=15){ x=pad(hh)+':'+pad(mm); h+='<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>'; }
+  for(hh=0;hh<24;hh++) for(mm=0;mm<60;mm++){ x=pad(hh)+':'+pad(mm); h+='<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>'; }
   if(cur&&!/:(00|15|30|45)$/.test(cur)) h+='<option value="'+cur+'" selected>'+cur+'</option>';
   return h+'</select>';
 }
@@ -1860,7 +1860,7 @@ function dayRowsHTML(pf,i){
 }
 function timeOptsD(f,i,j,cur,def){
   var h='<select data-pd="'+f+'" data-i="'+i+'" data-j="'+j+'" aria-label="'+(f==='a'?'Beginn':'Ende')+'"><option value="">'+(def?'wie oben':'--:--')+'</option>', x, hh, mm;
-  for(hh=0;hh<24;hh++) for(mm=0;mm<60;mm+=15){ x=pad(hh)+':'+pad(mm); h+='<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>'; }
+  for(hh=0;hh<24;hh++) for(mm=0;mm<60;mm++){ x=pad(hh)+':'+pad(mm); h+='<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>'; }
   if(cur&&!/:(00|15|30|45)$/.test(cur)) h+='<option value="'+cur+'" selected>'+cur+'</option>';
   return h+'</select>';
 }
@@ -2170,7 +2170,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='1.11.2026 · 22:00';
+var APPVER='1.11.2026 · 22:10';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
