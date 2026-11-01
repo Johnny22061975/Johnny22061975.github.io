@@ -1591,10 +1591,12 @@ function planCode(k,s){
 }
 function shSwap(k,s){ var o=S.shifts[k+'_'+s]; if(!o||o.code===undefined) return false; if(!(S.planSeq[k]&&S.planSeq[k].length&&S.plans[k])) return false; return (o.code==='-'?'':o.code)!==planCode(k,s); }
 function shSpan(k,c,s){ var sw=shSwap(k,s); if(!c&&!sw) return ''; return '<span class="sh'+(sw?' swp':'')+'" style="--pc:var(--p-'+k+')"'+(sw?' title="Getauscht (Plan: '+esc(planCode(k,s)||'frei')+')"':'')+'>'+esc(c||'–')+'</span>'; }
+// Urlaub/krank an diesem Tag für Person k? (Art Urlaub/Krank oder Wort im Titel; ohne Person = für alle)
+function offOn(k,s){ return eventsOn(s).some(function(ev){ var w=(ev.who||[]).filter(function(x){ return PEOPLE.indexOf(x)>-1; }); return (ev.cat==='urlaub'||ev.cat==='krank'||/urlaub|krank|reise/i.test(ev.title||''))&&(!w.length||w.indexOf(k)>-1); }); }
 function shiftOn(k,s){
   var out=[], o=S.shifts[k+'_'+s], c;
   if(o) c=(o.code==='-')?'':o.code; else c=planCode(k,s);
-  if(c&&eventsOn(s).some(function(ev){ var w=(ev.who||[]).filter(function(x){ return PEOPLE.indexOf(x)>-1; }); return (ev.cat==='urlaub'||ev.cat==='krank'||/urlaub|krank/i.test(ev.title||''))&&(!w.length||w.indexOf(k)>-1); })) c='';
+  if(offOn(k,s)) return [];
   if(c==='WE') c='TD';
   if(c) out.push(c);
   eventsOn(s).forEach(function(ev){ var e=SHIFTCAT[ev.cat]; if(e&&(ev.who||[]).indexOf(k)>-1&&out.indexOf(e)<0) out.push(e); });
@@ -2158,7 +2160,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='1.11.2026 · 16:30';
+var APPVER='1.11.2026 · 17:20';
 function settingsSheetHTML(){
   var pg=S.menuPage||'';
   if(!pg) return shHead('Menü',true)
