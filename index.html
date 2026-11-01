@@ -1588,7 +1588,7 @@ function planCode(k,s){
 function shiftOn(k,s){
   var out=[], o=S.shifts[k+'_'+s], c;
   if(o) c=(o.code==='-')?'':o.code; else c=planCode(k,s);
-  if(!o&&c&&eventsOn(s).some(function(ev){ return (ev.cat==='urlaub'||ev.cat==='krank')&&(ev.who||[]).indexOf(k)>-1; })) c='';
+  if(!o&&c&&eventsOn(s).some(function(ev){ var w=(ev.who||[]).filter(function(x){ return PEOPLE.indexOf(x)>-1; }); return (ev.cat==='urlaub'||ev.cat==='krank'||/urlaub|krank/i.test(ev.title||''))&&(!w.length||w.indexOf(k)>-1); })) c='';
   if(c==='WE') c='TD';
   if(c) out.push(c);
   eventsOn(s).forEach(function(ev){ var e=SHIFTCAT[ev.cat]; if(e&&(ev.who||[]).indexOf(k)>-1&&out.indexOf(e)<0) out.push(e); });
