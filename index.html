@@ -1250,7 +1250,7 @@ function rcptSave(ch){ if(!S.me||!S.store) return; var sv=rcpt(S.me)||{}, mi=S.r
   if(!dirty) return; S.rcptMine=o; clearTimeout(S.rcptT); S.rcptT=setTimeout(function(){ saveSettings('rcpt_'+S.me,S.rcptMine); },1500); }
 function rcptHTML(c,n){ var to=(c.fam?activePeople():(c.members||[])).filter(function(k){ return k!==S.me&&!isGenName(k)&&PEOPLE.indexOf(k)>-1&&!(S.people[k]&&S.people[k].nophone); }); if(!to.length) return '';
   var rd=to.filter(function(k){ var r=rcpt(k); return ((r.rd||{})[c.id]||0)>=n.ts; }), dl=to.every(function(k){ return rd.indexOf(k)>-1||(rcpt(k).rcv||0)>=n.ts; });
-  var ackOn=to.some(function(k){ return !!rcpt(k).ack; }), late=ackOn&&!dl&&Date.now()-n.ts>10000; if(!dl&&!late){ clearTimeout(S.rcptRT); S.rcptRT=setTimeout(function(){ if(S.tab==='notes'&&S.chatOpen) renderNotes(); },Math.max(500,10500-(Date.now()-n.ts))); }
+  var late=!dl&&Date.now()-n.ts>10000; if(!dl&&!late){ clearTimeout(S.rcptRT); S.rcptRT=setTimeout(function(){ if(S.tab==='notes'&&S.chatOpen) renderNotes(); },Math.max(500,10500-(Date.now()-n.ts))); }
   var miss=to.filter(function(k){ return rd.indexOf(k)<0&&!((rcpt(k).rcv||0)>=n.ts); }), open=!dl&&S.rcptWho===n.id&&miss.length;
   var dots='<span class="dots'+(late?' late':'')+'"><b></b>'+(dl?'<b></b>':'')+'</span>';
   if(!dl&&to.length>1) dots='<button type="button" class="dotbtn" data-a="rcptwho" data-id="'+esc(n.id)+'" aria-label="Wer hat die Nachricht noch nicht bekommen?" style="all:unset;cursor:pointer">'+dots+'</button>';
@@ -2232,7 +2232,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='2.11.2026 · 08:35';
+var APPVER='2.11.2026 · 08:27';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
