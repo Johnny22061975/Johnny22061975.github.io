@@ -2204,11 +2204,15 @@ function hrSave(c){ var o={cfg:c}; S.settingsRows=S.settingsRows||{}; S.settings
 function hrMin(t){ var m=/^(\d{1,2}):(\d{2})$/.exec(t||''); return m?(+m[1])*60+(+m[2]):null; }
 function hrFmt(m){ var neg=m<0; m=Math.abs(Math.round(m)); return (neg?'−':'')+Math.floor(m/60)+':'+pad(m%60); }
 function rawShift(k,s){ var o=S.shifts[k+'_'+s], c=o?(o.code==='-'?'':o.code):planCode(k,s); if(c==='WE') c='TD'; if(!c) eventsOn(s).some(function(ev){ var e=SHIFTCAT[ev.cat]; if(e&&(ev.who||[]).indexOf(k)>-1){ c=e; return true; } }); return c||''; }
-function hrMonth(k,ym,c){ var y=+ym.slice(0,4), mo=+ym.slice(5,7), dim=new Date(y,mo,0).getDate(), cnt={}, tot=0, miss=0, off=0, offMin=0, useOff=c.offcount!==false;
-  for(var d=1;d<=dim;d++){ var s=ym+'-'+pad(d), code=shiftOn(k,s)[0];
-    if(!code&&useOff&&offOn(k,s)){ var rc=rawShift(k,s); if(rc){ var t0=shiftTimes(k,s), a0=hrMin(t0.a), b0=hrMin(t0.b); off++; if(a0!==null&&b0!==null){ var u=b0-a0; if(u<=0) u+=1440; if(u>360) u-=(+c.pause||0); offMin+=Math.max(0,u); tot+=Math.max(0,u); } } continue; }
-    if(!code) continue; cnt[code]=(cnt[code]||0)+1; var tm=shiftTimes(k,s), a=hrMin(tm.a), b=hrMin(tm.b); if(a===null||b===null){ miss++; continue; } var du=b-a; if(du<=0) du+=1440; if(du>360) du-=(+c.pause||0); tot+=Math.max(0,du); }
-  return {cnt:cnt,tot:tot,miss:miss,off:off,offMin:offMin}; }
+function hrMonth(k,ym,c){ var y=+ym.slice(0,4), mo=+ym.slice(5,7), dim=new Date(y,mo,0).getDate(), cnt={}, tot=0, miss=0, off=0, offMin=0, useOff=c.offcount!==false, pz=(c.pause!=null&&c.pause!=='')?(+c.pause||0):30, rows=[];
+  var dur=function(tm){ var a=hrMin(tm.a), b=hrMin(tm.b); if(a===null||b===null) return null; var u=b-a; if(u<=0) u+=1440; var p=u>360?pz:0; return {u:Math.max(0,u-p),p:p}; };
+  for(var d=1;d<=dim;d++){ var s=ym+'-'+pad(d), code=shiftOn(k,s)[0], isOff=false;
+    if(!code&&useOff&&offOn(k,s)){ code=rawShift(k,s); isOff=!!code; }
+    if(!code) continue; var tm=shiftTimes(k,s), r=dur(tm);
+    if(isOff){ off++; } else cnt[code]=(cnt[code]||0)+1;
+    if(!r){ miss++; rows.push({s:s,c:code,off:isOff,a:tm.a,b:tm.b,m:null}); continue; }
+    tot+=r.u; if(isOff) offMin+=r.u; rows.push({s:s,c:code,off:isOff,a:tm.a,b:tm.b,m:r.u,p:r.p}); }
+  return {cnt:cnt,tot:tot,miss:miss,off:off,offMin:offMin,rows:rows,pz:pz}; }
 function hrHTML(){ var C=hrCfg(), act=activePeople(), ym=S.hrYm||ymd(new Date()).slice(0,7), y=+ym.slice(0,4), mo=+ym.slice(5,7);
   var h='<p class="hint">Freiwillig: Nur wer hier eingeschaltet ist, wird gezählt. Die Stunden kommen aus den Schicht-Uhrzeiten im Kalender.</p>';
   h+=act.map(function(k){ var c=C[k]||{}; return '<div class="panel" style="margin:0 0 10px;--pc:var(--p-'+k+')"><label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" data-hr="on" data-k="'+k+'"'+(c.on?' checked':'')+'><i class="pd"></i>'+esc(pname(k))+'</label>'
@@ -2221,13 +2225,14 @@ function hrHTML(){ var C=hrCfg(), act=activePeople(), ym=S.hrYm||ymd(new Date())
         +(r.off?'<tr><td>Urlaub / krank (geplante Schichten)</td><td>'+r.off+'× · '+hrFmt(r.offMin)+'</td></tr>':'')
         +'<tr><td><b>Stunden</b></td><td><b>'+hrFmt(r.tot)+'</b></td></tr>'
         +(soll>0?'<tr><td>Soll</td><td>'+hrFmt(soll*60)+'</td></tr><tr><td>'+(r.tot-soll*60>=0?'Plusstunden':'Minusstunden')+'</td><td><b>'+hrFmt(r.tot-soll*60)+'</b></td></tr>':'')
-        +(r.miss?'<tr><td colspan="2" class="hint">'+r.miss+' Schicht(en) ohne Uhrzeit nicht mitgezählt</td></tr>':'')+'</table>'; }).join('')+'</div>'; }
+        +(r.miss?'<tr><td colspan="2" class="hint">'+r.miss+' Schicht(en) ohne Uhrzeit nicht mitgezählt</td></tr>':'')+'</table>'
+        +(r.rows.length?'<details style="margin-top:6px"><summary class="hint">Alle Tage einzeln ansehen</summary><table class="hrt">'+r.rows.map(function(x){ return '<tr><td>'+esc(WD[weekday(x.s)]+' '+(+x.s.slice(8))+'.')+' '+esc(x.c)+(x.off?' 🏖️':'')+'</td><td>'+(x.m==null?'keine Uhrzeit':esc(x.a)+'–'+esc(x.b)+(x.p?' − '+x.p+' Min.':'')+' = <b>'+hrFmt(x.m)+'</b>')+'</td></tr>'; }).join('')+'</table><p class="hint">🏖️ = Urlaub oder krank, gezählt mit den Zeiten der geplanten Schicht. Pause: '+r.pz+' Min. bei Schichten über 6 Stunden.</p></details>':''); }).join('')+'</div>'; }
   return h; }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="hrym"]'); if(!t) return; e.stopImmediatePropagation(); var ym=S.hrYm||ymd(new Date()).slice(0,7), d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+(+t.dataset.v),1); S.hrYm=d.getFullYear()+'-'+pad(d.getMonth()+1); renderSheet(); },true);
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='2.11.2026 · 08:20';
+var APPVER='2.11.2026 · 08:35';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
