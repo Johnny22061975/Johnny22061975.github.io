@@ -11,7 +11,8 @@ self.addEventListener('fetch', e => {
   const font = u.hostname === 'fonts.googleapis.com' || u.hostname === 'fonts.gstatic.com';
   if (!own && !lib && !font) return;
   if (r.mode === 'navigate' || (own && /\/(index\.html)?$/.test(u.pathname))) {
-    e.respondWith(fetch(r.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => { if (res && res.ok) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); } return res; }).catch(() => caches.match(r).then(m => m || caches.match('./index.html'))));
+    // Erst die gespeicherte Seite zeigen, im Hintergrund die neue holen: so meldet die App eine neue Version mit Fenster, statt sie still zu laden
+    e.respondWith(caches.match(r).then(m => { const net = fetch(r.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => { if (res && res.ok) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); } return res; }); if (m) { net.catch(() => null); return m; } return net.catch(() => caches.match('./index.html')); }));
     return;
   }
   e.respondWith(caches.match(r).then(m => { const net = fetch(r).then(res => { if (res && (res.ok || res.type === 'opaque')) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); } return res; }).catch(() => m); return m || net; }));
