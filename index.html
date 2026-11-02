@@ -1041,9 +1041,9 @@ function applyLook(){ var b=document.body; if(!b) return; b.classList.toggle('sh
   else if(sp==='oct'||sp==='cut'){ var cv=parseFloat(lsGet('cutv')); if(!(cv>=0)) cv=9; r.style.setProperty('--cut',cv+'px'); b.classList.add('shp-oct'); }
   var mh=parseFloat(lsGet('mch')); if(mh>0){ r.style.setProperty('--mch',mh+'px'); b.classList.add('szm'); }
   var bh=parseFloat(lsGet('btnh')); if(bh>0){ r.style.setProperty('--btnh',bh+'px'); b.classList.add('szb'); } }
-function ordVis(){ return rowOrder().filter(function(k){ return k==='bins'||activePeople().indexOf(k)>-1; }); }
-function ordBtns(k){ var v=ordVis(), i=v.indexOf(k); if(i<0) return ''; return '<span class="ordb" style="display:inline-flex;gap:4px"><button type="button" class="btn sm" data-a="rowmv" data-k="'+k+'" data-n="-1"'+(i===0?' disabled':'')+' aria-label="Nach oben">▲</button><button type="button" class="btn sm" data-a="rowmv" data-k="'+k+'" data-n="1"'+(i===v.length-1?' disabled':'')+' aria-label="Nach unten">▼</button></span>'; }
-function ordRow(){ return '<div class="prow"><span style="flex:1;font-weight:600">🗑️ Müllabfuhr (Zeile im Kalender)</span>'+ordBtns('bins')+'</div>'; }
+function ordVis(){ return rowOrder().filter(function(k){ return k==='bins'||(PEOPLE.indexOf(k)>-1&&S.people[k]&&S.people[k].active); }); }
+function ordBtns(k,sm){ var v=ordVis(), i=v.indexOf(k); if(i<0) return ''; var st=sm||'min-height:42px;padding:0 12px;min-width:0;font-size:17px'; return '<button type="button" class="btn sm" style="'+st+'" data-a="rowmv" data-k="'+k+'" data-n="-1"'+(i===0?' disabled':'')+' aria-label="Nach oben">▲</button><button type="button" class="btn sm" style="'+st+'" data-a="rowmv" data-k="'+k+'" data-n="1"'+(i===v.length-1?' disabled':'')+' aria-label="Nach unten">▼</button>'; }
+function ordRow(){ return '<div class="prow" style="gap:8px;flex-wrap:nowrap;align-items:center"><span style="flex:1;font-weight:600;min-width:0">🗑️ Müllabfuhr</span>'+ordBtns('bins')+'</div>'; }
 function rowOrder(){ var v=[]; if(S.me&&S.rowOrd&&Array.isArray(S.rowOrd[S.me])) v=S.rowOrd[S.me].slice(); else try{ v=JSON.parse(lsGet('roworder')||'[]'); }catch(e){} if(!Array.isArray(v)) v=[]; var all=['bins'].concat(PEOPLE); v=v.filter(function(k){ return all.indexOf(k)>-1; }); all.forEach(function(k){ if(v.indexOf(k)<0) v.push(k); }); return v; }
 function dayCell(s,act,mf){ var d={bins:binsOn(s),it:{},sh:{}}; eventsOn(s).forEach(function(ev){ if(isAll(ev)||SHIFTCAT[ev.cat]) return; var va=evVis(ev); (ev.who||[]).forEach(function(k){ if(act.indexOf(k)>-1&&(va||mf.indexOf(k)>-1)) (d.it[k]=d.it[k]||[]).push(ev); }); });
   d.sw={}; act.forEach(function(k){ if(mf.indexOf(k)>-1){ var c=shiftOn(k,s); if(c.length) d.sh[k]=c[0]; if(shSwap(k,s)) d.sw[k]=s; } }); return d; }
@@ -1260,7 +1260,7 @@ function rcptHTML(c,n){ var to=(c.fam?activePeople():(c.members||[])).filter(fun
   return '<div class="rcpt" title="'+esc((dl?'Angekommen':late?'Noch nicht angekommen':'Gesendet')+(rd.length?' · gelesen von '+rd.map(pname).join(', '):''))+'">'+rd.map(function(k){ return '<i style="--pc:var(--p-'+k+')">'+esc(pname(k).slice(0,1).toUpperCase())+'</i>'; }).join('')+dots+(open?'<small style="width:100%;font-size:12px;color:var(--ink-2)">Noch nicht angekommen: '+miss.map(pname).map(esc).join(', ')+'</small>':'')+'</div>'; }
 function chatSeen(id){ return +(lsGet('seen_'+id)||0); }
 function chatUnread(id){ var t=chatSeen(id); return chatMsgs(id).filter(function(n){ return (n.ts||0)>t&&n.by!==S.me; }).length; }
-function chatList(){ var L=[chatById('all')].concat((S.chats||[]).filter(function(c){ return chatVisible(c.id); }));
+function chatList(){ var L=[].concat((S.chats||[]).filter(function(c){ return chatVisible(c.id); }));
   return L.map(function(c){ var m=chatMsgs(c.id); return {c:c,last:m[m.length-1]||null}; }).sort(function(a,b){ if(a.c.fam) return -1; if(b.c.fam) return 1; return ((b.last&&b.last.ts)||b.c.ts||0)-((a.last&&a.last.ts)||a.c.ts||0); }); }
 function avHTML(c){ var ks=c.fam?activePeople():c.members; return '<span class="av">'+ks.slice(0,4).map(function(k){ return '<i style="--pc:var(--p-'+k+')">'+esc(pname(k).slice(0,1))+'</i>'; }).join('')+'</span>'; }
 function chatPopInfo(){ var best=null, n=0; chatList().forEach(function(x){ var t=chatSeen(x.c.id); chatMsgs(x.c.id).forEach(function(m){ if((m.ts||0)>t&&m.by!==S.me){ n++; if(!best||(m.ts||0)>best.ts) best={chat:x.c.id,ts:m.ts||0,m:m,name:chatName(x.c)}; } }); }); if(best) best.n=n; return best; }
@@ -2235,7 +2235,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='2.11.2026 · 09:27';
+var APPVER='2.11.2026 · 19:52';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2391,14 +2391,17 @@ function settingsSheetHTML(){
       return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="setme" data-k="'+k+'" aria-pressed="'+(S.me===k)+'"><i class="pd"></i>'+esc(pname(k))+'</button>';
     }).join('')+'</div></div>';
   else if(pg==='familie'){
-  var rows=rowOrder().filter(function(k){ return k==='bins'||PEOPLE.indexOf(k)>-1; }).map(function(k){
+  var rows=rowOrder().filter(function(k){ return k==='bins'||(PEOPLE.indexOf(k)>-1&&S.people[k]&&S.people[k].active); }).map(function(k){
     if(k==='bins') return ordRow();
-    var p=S.people[k], ed=S.pedit===k, dl=S.pdel===k;
-    return '<div class="prow" style="--pc:var(--p-'+k+')"><button type="button" class="pcb" data-a="pcolor" data-k="'+k+'" aria-label="Farbe wählen"><i class="pd"></i></button><input type="text" data-p="name" data-k="'+k+'" value="'+esc(p.name)+'" maxlength="24" aria-label="Name"><label><input type="checkbox" data-p="active" data-k="'+k+'"'+(p.active?' checked':'')+'>Anzeigen</label><label title="Schicht-Wecker"><input type="checkbox" data-p="shalarm" data-k="'+k+'"'+(hasShAlarm(k)?' checked':'')+'>⏰</label><label title="Hat noch kein Handy"><input type="checkbox" data-p="nophone" data-k="'+k+'"'+(p.nophone?' checked':'')+'>📵</label>'
-      +ordBtns(k)+(PEOPLE.length>1?'<button type="button" class="btn '+(dl?'dng':'')+' pdl" data-a="pdel" data-k="'+k+'" aria-label="Person löschen">'+(dl?'Wirklich?':'🗑')+'</button>':'')+'</div>'
+    var p=S.people[k], ed=S.pedit===k, dl=S.pdel===k, op=S.psetK===k;
+    var sm='min-height:42px;padding:0 12px;min-width:0;font-size:17px';
+    return '<div class="prow" style="--pc:var(--p-'+k+');gap:8px;flex-wrap:nowrap;align-items:center"><button type="button" class="pcb" data-a="pcolor" data-k="'+k+'" aria-label="Farbe wählen"><i class="pd"></i></button><input type="text" data-p="name" data-k="'+k+'" value="'+esc(p.name)+'" maxlength="24" aria-label="Name" style="flex:0 0 120px;width:120px;min-width:0;padding:6px 8px">'
+      +ordBtns(k,sm)+'<button type="button" class="btn sm" style="'+sm+'" data-a="pset" data-k="'+k+'" aria-expanded="'+(op?'true':'false')+'" aria-label="Einstellungen">⚙</button>'
+      +(op?'<label title="Schicht-Wecker" style="display:inline-flex;align-items:center"><input type="checkbox" data-p="shalarm" data-k="'+k+'"'+(hasShAlarm(k)?' checked':'')+' style="width:24px;height:24px;margin:0" aria-label="Schicht-Wecker">⏰</label><label title="Hat noch kein Handy" style="display:inline-flex;align-items:center"><input type="checkbox" data-p="nophone" data-k="'+k+'"'+(p.nophone?' checked':'')+' style="width:24px;height:24px;margin:0" aria-label="Hat noch kein Handy">📵</label>':'')
+      +(PEOPLE.length>1?'<button type="button" class="btn '+(dl?'dng':'')+' pdl" style="'+sm+'" data-a="pdel" data-k="'+k+'" aria-label="Person löschen">'+(dl?'Wirklich löschen?':'🗑')+'</button>':'')+'</div>'
       +(ed?'<div class="pcol">'+PALETTE.map(function(c){ return '<button type="button" class="sw" style="background:'+c+'" data-a="pcol" data-k="'+k+'" data-c="'+c+'" aria-label="Farbe '+c+'"></button>'; }).join('')+'<label class="swc">Eigene<input type="color" data-p="color" data-k="'+k+'" value="'+(p.color||PALETTE[0])+'"></label></div>':'');
-  }).join('')+(PEOPLE.length<20?'<button type="button" class="btn" data-a="padd">+ Person hinzufügen</button>':'');
-    body='<div class="fld"><span class="lbl">Familie und Weitere</span>'+rows+'<p class="hint">Tippe auf den farbigen Punkt, um die Farbe zu ändern. Bis zu 20 Personen, zum Beispiel auch Oma oder eine Firma. „Anzeigen“ blendet eine Person aus, ohne sie zu löschen. ⏰ = Schicht-Wecker: Nur diese Personen erscheinen unter „Erinnerungen & Wecker“ bei den Schicht-Weckern. 📵 = Hat noch kein Handy: Diese Person zählt im Chat bei den Punkten „angekommen“ nicht mit.</p></div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
+  }).join('')+((PEOPLE.length<20||PEOPLE.some(function(k){ return S.people[k]&&!S.people[k].active; }))?'<button type="button" class="btn" data-a="padd">+ Person hinzufügen</button>':'');
+    body='<div class="fld"><span class="lbl">Familie und Weitere</span>'+rows+'<p class="hint">Farbpunkt antippen: Farbe ändern.<br>▲ ▼: Reihenfolge der Zeilen im Kalender, auch für die Müllabfuhr.<br>⚙: öffnet ⏰ Schicht-Wecker (nur diese Personen erscheinen unter „Erinnerungen &amp; Wecker“) und 📵 Hat noch kein Handy (zählt im Chat bei den Punkten nicht mit).<br>🗑: Person löschen. Zweimal tippen. Dabei gehen auch ihr Schichtplan und ihre Einstellungen verloren.<br>„+ Person hinzufügen“: neue Person anlegen, bis zu 20, zum Beispiel die Oma.</p></div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
   var lockable=['darst','stil','farben','reiter','wecker','familie'].indexOf(pg)>-1, locked=lockable&&!S.lookEdit;
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
   return shHead(title)+body;
@@ -2658,7 +2661,8 @@ document.addEventListener('click',function(e){
     case 'bgtab': S.bgEdit=t.dataset.v||''; S.bgUi=null; applyBg(); renderSheet(); break;
     case 'bgsame': if(S.bgEdit){ ['bgm','bgs','bgv'].forEach(function(k){ lsSet(k+'@'+S.bgEdit,''); }); applyBg(); renderSheet(); } break;
     case 'bgstyle': S.bgUi=t.dataset.v; renderSheet(); setTimeout(function(){ var bc=$('#bgcols'); if(bc&&bc.scrollIntoView) bc.scrollIntoView({behavior:'smooth',block:'start'}); },60); break;
-    case 'rowmv': var ro=rowOrder(), vis=ro.filter(function(k){ return k==='bins'||activePeople().indexOf(k)>-1; }), ix=vis.indexOf(t.dataset.k), jx=ix+(+t.dataset.n); if(ix>-1&&jx>=0&&jx<vis.length){ var tmp=vis[ix]; vis[ix]=vis[jx]; vis[jx]=tmp; var rest=ro.filter(function(k){ return vis.indexOf(k)<0; }), nro=vis.concat(rest); lsSet('roworder',JSON.stringify(nro)); if(S.me&&S.store){ var RO=JSON.parse(JSON.stringify(S.rowOrd||{})); RO[S.me]=nro; S.rowOrd=RO; saveSettings('roworder',{p:RO}); } renderCal(); renderSheet(); } break;
+    case 'pset': S.psetK=S.psetK===t.dataset.k?null:t.dataset.k; renderSheet(); break;
+    case 'rowmv': var ro=rowOrder(), vis=ro.filter(function(k){ return k==='bins'||(PEOPLE.indexOf(k)>-1&&S.people[k]&&S.people[k].active); }), ix=vis.indexOf(t.dataset.k), jx=ix+(+t.dataset.n); if(ix>-1&&jx>=0&&jx<vis.length){ var tmp=vis[ix]; vis[ix]=vis[jx]; vis[jx]=tmp; var rest=ro.filter(function(k){ return vis.indexOf(k)<0; }), nro=vis.concat(rest); lsSet('roworder',JSON.stringify(nro)); if(S.me&&S.store){ var RO=JSON.parse(JSON.stringify(S.rowOrd||{})); RO[S.me]=nro; S.rowOrd=RO; saveSettings('roworder',{p:RO}); } renderCal(); renderSheet(); } break;
     case 'shlay': lsSet('shlay',t.dataset.v); applyLook(); renderCal(); renderSheet(); break;
     case 'contour': lsSet('contour',t.dataset.v); applyLook(); renderSheet(); break;
     case 'ctcol': lsSet('ctcol',t.dataset.v==='own'?'hsl(300, 90%, 55%)':t.dataset.v); applyLook(); renderSheet(); break;
@@ -2754,7 +2758,7 @@ document.addEventListener('click',function(e){
     case 'titlequick': if(f&&S.sample){ f.quick=f.title; runQuick(); } break;
     case 'pcolor': S.pedit=(S.pedit===t.dataset.k?'':t.dataset.k); S.pdel=''; renderSheet(); break;
     case 'pcol': S.people[t.dataset.k].color=t.dataset.c; applyPeopleColors(); savePeople(); renderNotice(); renderCal(); renderSheet(); break;
-    case 'padd': if(PEOPLE.length<20){ var nk='x'+Date.now().toString(36); PEOPLE.push(nk); S.people[nk]={name:'Person '+PEOPLE.length,active:true,color:PALETTE[(PEOPLE.length-1)%PALETTE.length]}; S.pedit=nk; S.pdel=''; applyPeopleColors(); savePeople(); renderNotice(); renderCal(); renderShopForm(); renderSheet(); } break;
+    case 'padd': var hid=PEOPLE.filter(function(k){ return S.people[k]&&!S.people[k].active; })[0]; if(hid||PEOPLE.length<20){ var nk=hid||('x'+Date.now().toString(36)); if(!hid) PEOPLE.push(nk); var na=PEOPLE.filter(function(k){ return S.people[k]&&S.people[k].active; }).length+1; S.people[nk]={name:'Person '+na,active:true,color:(hid&&S.people[hid].color)||PALETTE[(na-1)%PALETTE.length]}; S.pedit=nk; S.pdel=''; applyPeopleColors(); savePeople(); renderNotice(); renderCal(); renderShopForm(); renderSheet(); } break;
     case 'pdel': var dk=t.dataset.k;
       if(S.pdel!==dk){ S.pdel=dk; renderSheet(); break; }
       if(PEOPLE.length>1){ PEOPLE.splice(PEOPLE.indexOf(dk),1); delete S.people[dk]; delete S.plans[dk]; if(S.me===dk){ S.me=null; lsSet('me',''); } S.pdel=''; S.pedit=''; savePeople(); if(S.store&&plansRaw) saveSettings('plans',plansRaw()); renderNotice(); renderCal(); renderShopForm(); renderNotes(); renderSheet(); } break;
