@@ -2185,27 +2185,31 @@ function hrCfg(){ var r=(S.settingsRows||{}).hours; return (r&&typeof r==='objec
 function hrSave(c){ var o={cfg:c}; S.settingsRows=S.settingsRows||{}; S.settingsRows.hours=o; saveSettings('hours',o); }
 function hrMin(t){ var m=/^(\d{1,2}):(\d{2})$/.exec(t||''); return m?(+m[1])*60+(+m[2]):null; }
 function hrFmt(m){ var neg=m<0; m=Math.abs(Math.round(m)); return (neg?'−':'')+Math.floor(m/60)+':'+pad(m%60); }
-function hrMonth(k,ym,c){ var y=+ym.slice(0,4), mo=+ym.slice(5,7), dim=new Date(y,mo,0).getDate(), cnt={}, tot=0, miss=0;
-  for(var d=1;d<=dim;d++){ var s=ym+'-'+pad(d), code=shiftOn(k,s)[0]; if(!code) continue; cnt[code]=(cnt[code]||0)+1; var tm=shiftTimes(k,s), a=hrMin(tm.a), b=hrMin(tm.b); if(a===null||b===null){ miss++; continue; } var du=b-a; if(du<=0) du+=1440; if(du>360) du-=(+c.pause||0); tot+=Math.max(0,du); }
-  return {cnt:cnt,tot:tot,miss:miss}; }
+function rawShift(k,s){ var o=S.shifts[k+'_'+s], c=o?(o.code==='-'?'':o.code):planCode(k,s); if(c==='WE') c='TD'; if(!c) eventsOn(s).some(function(ev){ var e=SHIFTCAT[ev.cat]; if(e&&(ev.who||[]).indexOf(k)>-1){ c=e; return true; } }); return c||''; }
+function hrMonth(k,ym,c){ var y=+ym.slice(0,4), mo=+ym.slice(5,7), dim=new Date(y,mo,0).getDate(), cnt={}, tot=0, miss=0, off=0, offMin=0, useOff=c.offcount!==false;
+  for(var d=1;d<=dim;d++){ var s=ym+'-'+pad(d), code=shiftOn(k,s)[0];
+    if(!code&&useOff&&offOn(k,s)){ var rc=rawShift(k,s); if(rc){ var t0=shiftTimes(k,s), a0=hrMin(t0.a), b0=hrMin(t0.b); off++; if(a0!==null&&b0!==null){ var u=b0-a0; if(u<=0) u+=1440; if(u>360) u-=(+c.pause||0); offMin+=Math.max(0,u); tot+=Math.max(0,u); } } continue; }
+    if(!code) continue; cnt[code]=(cnt[code]||0)+1; var tm=shiftTimes(k,s), a=hrMin(tm.a), b=hrMin(tm.b); if(a===null||b===null){ miss++; continue; } var du=b-a; if(du<=0) du+=1440; if(du>360) du-=(+c.pause||0); tot+=Math.max(0,du); }
+  return {cnt:cnt,tot:tot,miss:miss,off:off,offMin:offMin}; }
 function hrHTML(){ var C=hrCfg(), act=activePeople(), ym=S.hrYm||ymd(new Date()).slice(0,7), y=+ym.slice(0,4), mo=+ym.slice(5,7);
   var h='<p class="hint">Freiwillig: Nur wer hier eingeschaltet ist, wird gezählt. Die Stunden kommen aus den Schicht-Uhrzeiten im Kalender.</p>';
   h+=act.map(function(k){ var c=C[k]||{}; return '<div class="panel" style="margin:0 0 10px;--pc:var(--p-'+k+')"><label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" data-hr="on" data-k="'+k+'"'+(c.on?' checked':'')+'><i class="pd"></i>'+esc(pname(k))+'</label>'
-    +(c.on?'<div class="hrin" style="margin-top:8px"><div class="fld"><label class="lbl">Pause pro Schicht (Min.)</label><input type="number" min="0" max="120" step="5" inputmode="numeric" data-hr="pause" data-k="'+k+'" value="'+(c.pause!=null?c.pause:30)+'"></div><div class="fld"><label class="lbl">Soll pro Monat (Std., optional)</label><input type="number" min="0" max="300" step="0.5" inputmode="decimal" data-hr="soll" data-k="'+k+'" value="'+(c.soll||'')+'"></div></div><p class="hint" style="margin:0">Die Pause wird nur bei Schichten über 6 Stunden abgezogen.</p>':'')+'</div>'; }).join('');
+    +(c.on?'<div class="hrin" style="margin-top:8px"><div class="fld"><label class="lbl">Pause pro Schicht (Min.)</label><input type="number" min="0" max="120" step="5" inputmode="numeric" data-hr="pause" data-k="'+k+'" value="'+(c.pause!=null?c.pause:30)+'"></div><div class="fld"><label class="lbl">Soll pro Monat (Std., optional)</label><input type="number" min="0" max="300" step="0.5" inputmode="decimal" data-hr="soll" data-k="'+k+'" value="'+(c.soll||'')+'"></div></div><p class="hint" style="margin:0">Die Pause wird nur bei Schichten über 6 Stunden abgezogen.</p><label style="display:flex;gap:10px;align-items:center;margin-top:8px"><input type="checkbox" data-hr="offcount" data-k="'+k+'"'+(c.offcount!==false?' checked':'')+'>Urlaub und Krankheit als Arbeitszeit zählen (mit den Stunden der geplanten Schicht)</label>':'')+'</div>'; }).join('');
   var on=act.filter(function(k){ return (C[k]||{}).on; });
   if(on.length){ h+='<div class="fld"><div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><button type="button" class="btn sm" data-a="hrym" data-v="-1" aria-label="Monat zurück">'+ic('chevL',18)+'</button><b>'+esc(MON[mo-1]+' '+y)+'</b><button type="button" class="btn sm" data-a="hrym" data-v="1" aria-label="Monat vor">'+ic('chevR',18)+'</button></div>';
     h+=on.map(function(k){ var c=C[k], r=hrMonth(k,ym,c), codes=Object.keys(r.cnt).sort(), soll=parseFloat(String(c.soll||'').replace(',','.'));
       return '<table class="hrt" style="margin-top:10px"><tr><th colspan="2" style="color:var(--p-'+k+')">'+esc(pname(k))+'</th></tr>'
         +(codes.length?codes.map(function(cd){ return '<tr><td>'+esc(({F:'Frühschicht',S:'Spätschicht',N:'Nachtschicht',TD:'Tagdienst'})[cd]||cd)+'</td><td>'+r.cnt[cd]+'×</td></tr>'; }).join(''):'<tr><td colspan="2">Keine Schichten in diesem Monat</td></tr>')
+        +(r.off?'<tr><td>Urlaub / krank (geplante Schichten)</td><td>'+r.off+'× · '+hrFmt(r.offMin)+'</td></tr>':'')
         +'<tr><td><b>Stunden</b></td><td><b>'+hrFmt(r.tot)+'</b></td></tr>'
         +(soll>0?'<tr><td>Soll</td><td>'+hrFmt(soll*60)+'</td></tr><tr><td>'+(r.tot-soll*60>=0?'Plusstunden':'Minusstunden')+'</td><td><b>'+hrFmt(r.tot-soll*60)+'</b></td></tr>':'')
         +(r.miss?'<tr><td colspan="2" class="hint">'+r.miss+' Schicht(en) ohne Uhrzeit nicht mitgezählt</td></tr>':'')+'</table>'; }).join('')+'</div>'; }
   return h; }
 document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="hrym"]'); if(!t) return; e.stopImmediatePropagation(); var ym=S.hrYm||ymd(new Date()).slice(0,7), d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+(+t.dataset.v),1); S.hrYm=d.getFullYear()+'-'+pad(d.getMonth()+1); renderSheet(); },true);
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
-  if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
+  if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='1.11.2026 · 23:00';
+var APPVER='2.11.2026 · 07:30';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
