@@ -1419,7 +1419,17 @@ function betrHTML(k,maxWd){ var o=betrGet(k), N=['Montag','Dienstag','Mittwoch',
   return '<div class="panel"><b class="bpt">🧸 Betreuung nach dem Unterricht</b><p class="hint" style="margin-top:0">Trag pro Tag ein, bis wann '+esc(pname(k))+' in der Betreuung (Hort, Ganztag) bleibt. Leer = an dem Tag keine Betreuung. Der Rückbus wird dann nach dem Ende der Betreuung ausgesucht.</p>'
     +'<div style="display:grid;gap:6px">'+N.slice(0,maxWd+1).map(function(n,wd){ var v=o[wd]||''; return '<label style="display:flex;align-items:center;gap:10px"><span style="width:96px">'+n+'</span><input type="time" data-betr="'+wd+'" data-k="'+k+'" value="'+esc(v)+'" style="flex:0 0 120px;width:120px">'+(v?'<button type="button" class="btn sm" data-a="betrx" data-k="'+k+'" data-wd="'+wd+'" aria-label="Betreuung '+n+' löschen">✕</button>':'<small style="color:var(--ink-2)">keine</small>')+'</label>'; }).join('')+'</div></div>'; }
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||el.dataset.betr===undefined) return; betrSet(el.dataset.k,+el.dataset.betr,el.value); });
-document.addEventListener('click',function(e){ var t=e.target.closest&&e.target.closest('[data-a="betrx"]'); if(!t) return; e.stopImmediatePropagation(); betrSet(t.dataset.k,+t.dataset.wd,''); },true);
+function betrDayHTML(k,wd,has){ var v=betrGet(k)[wd]||'', ed=S.betrEd&&S.betrEd.k===k&&S.betrEd.wd===wd;
+  if(ed) return '<div class="betred" style="margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:10px;display:grid;gap:8px"><label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>🧸 Betreuung bis</span><input type="time" id="betrIn" value="'+esc(v||'15:00')+'" style="flex:0 0 120px;width:120px"></label><div class="btns" style="margin:0"><button type="button" class="btn sm pri" data-a="betrok">Speichern</button>'+(v?'<button type="button" class="btn sm danger" data-a="betrdel">Löschen</button>':'')+'<button type="button" class="btn sm" data-a="betrno">Abbrechen</button></div></div>';
+  if(v) return '<button type="button" class="sl" data-a="betred" data-k="'+k+'" data-wd="'+wd+'" style="opacity:.9"><time>bis '+esc(v)+'</time><b>🧸 Betreuung</b></button>';
+  return has?'<button type="button" class="btn sm" data-a="betred" data-k="'+k+'" data-wd="'+wd+'" style="margin-top:6px;min-height:32px">+ Betreuung</button>':''; }
+document.addEventListener('click',function(e){ var t=e.target.closest&&e.target.closest('[data-a="betred"],[data-a="betrok"],[data-a="betrdel"],[data-a="betrno"],[data-a="betrx"]'); if(!t) return; e.stopImmediatePropagation(); var a=t.dataset.a, ed=S.betrEd;
+  if(a==='betred'){ S.betrEd={k:t.dataset.k,wd:+t.dataset.wd}; renderSchool(); var i=$('#betrIn'); if(i) try{ i.focus(); }catch(x){} return; }
+  if(a==='betrx'){ betrSet(t.dataset.k,+t.dataset.wd,''); return; }
+  if(!ed) return; S.betrEd=null;
+  if(a==='betrok'){ var iv=$('#betrIn'), v=iv?iv.value:''; if(!/^\d{2}:\d{2}$/.test(v)){ S.betrEd=ed; toast('Bitte eine Uhrzeit wählen.'); return; } betrSet(ed.k,ed.wd,v); return; }
+  if(a==='betrdel'){ betrSet(ed.k,ed.wd,''); return; }
+  renderSchool(); },true);
 function renderSchool(){ var box=$('#schoolBox'); if(!box) return; var kids=schoolKids(); if(kids.indexOf(S.schoolKid)<0) S.schoolKid=kids[0]; var k=S.schoolKid, today=ymd(new Date());
   var tt=S.events.filter(function(ev){ return ev.cat==='schule'&&ev.recur&&ev.recur!=='none'&&(ev.who||[]).indexOf(k)>-1&&(!ev.until||ev.until>=today); });
   var days={}; tt.forEach(function(ev){ var wd=weekday(ev.date); (days[wd]=days[wd]||[]).push(ev); });
@@ -1432,8 +1442,8 @@ function renderSchool(){ var box=$('#schoolBox'); if(!box) return; var kids=scho
   else h+='<div class="sgrid">'+[0,1,2,3,4,5].filter(function(wd){ return wd<5||days[wd]; }).map(function(wd){ var L=[]; (days[wd]||[]).forEach(function(ev){ if(Array.isArray(ev.lessons)&&ev.lessons.length) ev.lessons.forEach(function(l,li){ L.push({start:l.start,end:l.end,t:l.subject,r:l.room,id:ev.id,li:li}); }); else L.push({start:ev.start,end:ev.end,t:ev.title,r:'',id:ev.id,li:-1}); });
       L.sort(function(a,b){ return (a.start||'')<(b.start||'')?-1:1; });
       var isT=weekday(today)===wd;
-      return '<div class="sday'+(isT?' td':'')+'"><span class="sdh">'+['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][wd]+'</span>'+ftDayHTML(k,wd,L)+(L.length?L.map(function(l){ return '<button type="button" class="sl" data-a="sedit" data-id="'+esc(l.id)+'" data-li="'+l.li+'" data-wd="'+wd+'"><time>'+esc(l.start||'')+(l.end?'–'+esc(l.end):'')+'</time><b>'+esc(l.t||'')+'</b>'+(l.r?'<small>'+esc(l.r)+'</small>':'')+'</button>'; }).join('')+(betrGet(k)[wd]?'<div class="sl" style="opacity:.9"><time>bis '+esc(betrGet(k)[wd])+'</time><b>🧸 Betreuung</b></div>':''):'<span class="hint">frei</span>')+'</div>'; }).join('')+'</div><p class="hint">Eine Stunde antippen: ändern oder löschen, nur für einen Tag (Ausfall, Vertretung) oder dauerhaft (z. B. Kurs abgewählt).</p>';
-  h+='</div>'+(tt.length?betrHTML(k,days[5]?5:4):'');
+      return '<div class="sday'+(isT?' td':'')+'"><span class="sdh">'+['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][wd]+'</span>'+ftDayHTML(k,wd,L)+(L.length?L.map(function(l){ return '<button type="button" class="sl" data-a="sedit" data-id="'+esc(l.id)+'" data-li="'+l.li+'" data-wd="'+wd+'"><time>'+esc(l.start||'')+(l.end?'–'+esc(l.end):'')+'</time><b>'+esc(l.t||'')+'</b>'+(l.r?'<small>'+esc(l.r)+'</small>':'')+'</button>'; }).join(''):'<span class="hint">frei</span>')+betrDayHTML(k,wd,L.length)+'</div>'; }).join('')+'</div><p class="hint">Eine Stunde antippen: ändern oder löschen, nur für einen Tag (Ausfall, Vertretung) oder dauerhaft (z. B. Kurs abgewählt).</p>';
+  h+='</div>';
   var up=[], seen={};
   for(var i=0;i<90&&up.length<12;i++){ var ds=addDays(today,i);
     eventsOn(ds).forEach(function(ev){ if(seen[ev.id]) return; var rel=(ev.cat==='schulfrei')||(ev.cat==='schule'&&!ev.ovOf&&(ev.recur||'none')==='none'&&(ev.who||[]).indexOf(k)>-1); if(!rel) return; seen[ev.id]=1; up.push({d:ds,ev:ev}); }); }
@@ -2263,7 +2273,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='4.11.2026 · 09:38';
+var APPVER='4.11.2026 · 09:42';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
