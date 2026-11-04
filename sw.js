@@ -1,5 +1,5 @@
 // Familien-Planer Service Worker: App offline startbar machen
-const C = 'fp-v8';
+const C = 'fp-v9';
 const CORE = ['./', './index.html', './config.js', './fb.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => Promise.all(CORE.map(u => c.add(u).catch(() => null)))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C && k !== 'fp-diag').map(k => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -10,9 +10,15 @@ self.addEventListener('fetch', e => {
   const lib = u.hostname === 'www.gstatic.com' && u.pathname.startsWith('/firebasejs/');
   const font = u.hostname === 'fonts.googleapis.com' || u.hostname === 'fonts.gstatic.com';
   if (!own && !lib && !font) return;
-  if (r.mode === 'navigate' || (own && /\/(index\.html)?$/.test(u.pathname))) {
-    // Erst die gespeicherte Seite zeigen, im Hintergrund die neue holen: so meldet die App eine neue Version mit Fenster, statt sie still zu laden
-    e.respondWith(caches.match(r).then(m => { const net = fetch(r.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => { if (res && res.ok) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); } return res; }); if (m) { net.catch(() => null); return m; } return net.catch(() => caches.match('./index.html')); }));
+  const page = own && /\/(index\.html)?$/.test(u.pathname);
+  // Versionsprüfung der App (index.html?v=…): immer direkt aus dem Netz, nichts speichern
+  if (page && u.search && r.mode !== 'navigate') return;
+  if (r.mode === 'navigate' || page) {
+    // Die App startet immer mit der gespeicherten Version. Eine neue Version wird NICHT still im Hintergrund geladen,
+    // sondern erst, wenn man im Fenster „Neue Version verfügbar“ auf „Jetzt aktualisieren“ tippt (dann wird der Speicher geleert).
+    const fresh = () => { const nu = new URL('./index.html', self.registration.scope); nu.searchParams.set('fpv', String(Date.now()));
+      return fetch(nu.toString(), { cache: 'no-store', credentials: 'same-origin' }).then(res => { if (res && res.ok) { const cp = res.clone(); caches.open(C).then(c => c.put('./index.html', cp)); } return res; }); };
+    e.respondWith(caches.match('./index.html').then(m => m || fresh().catch(() => caches.match(r))));
     return;
   }
   e.respondWith(caches.match(r).then(m => { const net = fetch(r).then(res => { if (res && (res.ok || res.type === 'opaque')) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); } return res; }).catch(() => m); return m || net; }));

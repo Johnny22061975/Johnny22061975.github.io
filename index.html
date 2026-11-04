@@ -849,9 +849,10 @@ function renderTop(){
 }
 
 // ---------- Neue Version erkennen, Hinweis + Benachrichtigung an die Familie ----------
-function verReload(){ try{ if(window.caches) caches.keys().then(function(ks){ return Promise.all(ks.filter(function(k){ return k!=='fp-diag'; }).map(function(k){ return caches.delete(k); })); }).catch(function(){}); }catch(e){}
-  try{ if(navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update(); }).catch(function(){}); }catch(e){}
-  setTimeout(function(){ location.reload(); },400); }
+function verReload(){ var go=function(){ try{ location.reload(); }catch(e){} }, t=setTimeout(go,2500), done=function(){ clearTimeout(t); go(); };
+  var p1=Promise.resolve(); try{ if(window.caches) p1=caches.keys().then(function(ks){ return Promise.all(ks.filter(function(k){ return k!=='fp-diag'; }).map(function(k){ return caches.delete(k); })); }).catch(function(){}); }catch(e){}
+  var p2=Promise.resolve(); try{ if(navigator.serviceWorker) p2=navigator.serviceWorker.getRegistration().then(function(r){ return r&&r.update(); }).catch(function(){}); }catch(e){}
+  Promise.all([p1,p2]).then(done,done); }
 function verModal(){ var o=document.querySelector('.vermod'); if(!S.newVer||S.verLater===S.newVer){ if(o) o.remove(); return; } if(o) return;
   o=document.createElement('div'); o.className='vermod'; o.innerHTML='<div class="verin" role="dialog" aria-label="Neue Version"><div style="font-size:40px;line-height:1">🔄</div><b>Neue Version verfügbar</b><small>'+esc(S.newVer)+'</small><button type="button" class="btn pri" data-a="verupd">Jetzt aktualisieren</button><button type="button" class="btn sm" data-a="verlater">Später</button></div>'; document.body.appendChild(o); }
 function verBusy(){ var ae=document.activeElement; return !!(S.sheet||(ae&&(ae.tagName==='TEXTAREA'||(ae.tagName==='INPUT'&&ae.type!=='checkbox'&&ae.type!=='file'))) ); }
@@ -862,7 +863,7 @@ function verCheck(auto){ if(!/^https?:/.test(location.protocol)) return; if(S.ve
     var tr=(lsGet('vertry')||'').split('|'), recent=tr[0]===nv&&Date.now()-(+tr[1]||0)<180000;
     renderNotice(); }).catch(function(){}); }
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) verCheck(true); });
-setTimeout(function(){ verCheck(true); },4000); setInterval(function(){ if(!document.hidden) verCheck(false); },10*60000);
+setTimeout(function(){ verCheck(true); },600); setInterval(function(){ if(!document.hidden) verCheck(false); },10*60000);
 function renderNotice(){
   var out=[];
   if(!S.me){
@@ -2273,7 +2274,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='4.11.2026 · 09:42';
+var APPVER='4.11.2026 · 09:48';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
