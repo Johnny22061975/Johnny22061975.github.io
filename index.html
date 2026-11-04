@@ -2136,6 +2136,7 @@ function ftHTML(){
         +(x.hin&&x.hin.length?'<div class="ftt"><b>Hinfahrt (Abfahrt)</b>'+x.hin.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div>':'')
         +(x.rueck&&x.rueck.length?'<div class="ftt"><b>Rückfahrt (Ankunft)</b>'+x.rueck.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div>':'')
         +(x.note?'<p class="hint" style="margin:0">'+esc(x.note)+'</p>':'')
+        +ftLiveHTML(x)
         +(phs.length?'<div class="ftph">'+phs.map(function(p){ return '<button type="button" data-a="ftview" data-id="'+esc(p.id)+'" aria-label="Foto groß ansehen"><img src="'+esc(p.data)+'" alt=""></button>'; }).join('')+'</div>':'')+'</div>'; }).join('')
     :'<p class="hint">Noch keine Fahrpläne. Lege für jede Haltestelle einen Eintrag an, zum Beispiel den Schulbus mit beiden Haltestellen.</p>')
     +'<div class="btns"><button type="button" class="btn pri" data-a="ftnew">+ Haltestelle hinzufügen</button></div>'; }
@@ -2180,7 +2181,26 @@ function ftScanSend(blob,isPdf,sc,fail,origFile){ var f=S.ft; if(!f) return; var
         if(!isPdf&&file&&S.ft&&S.ft.id){ var fid=S.ft.id; ntImg(file,function(d2){ if(!d2) return; var now=Date.now(); safe(function(){ return S.store.set('citems',S.store.newId(),{kind:'photo',topic:fid,data:d2,by:S.me||'',ts:now,ct:now}); }); }); }
       },function(e){ var c=e&&e.code; fail(c==='offline'?'Für das Auslesen braucht die App Internet.':c==='rate_limited'?'Gerade zu viele Anfragen. Versuch es später nochmal.':c==='images_unavailable'?'Fotos auslesen geht hier gerade nicht.':c==='ai_disabled'?'Die Auswertung ist in Firebase nicht eingeschaltet (AI Logic).':c==='invalid_json'?'Die Auswertung hat eine unlesbare Antwort geliefert. Bitte nochmal versuchen, am besten mit einem Ausschnitt nur deiner Linie.':'Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(0,140)+').'); }); }
 function ftSaveList(L){ var o={list:L}; S.settingsRows=S.settingsRows||{}; S.settingsRows.fahrplan=o; return saveSettings('fahrplan',o); }
+function ftWorker(){ var c=(S.settingsRows||{}).pushcfg||{}; return /^https:\/\/[^\s\/]+\.workers\.dev$/.test(c.worker||'')?c.worker:''; }
+function ftLiveHTML(x){ var L=(S.ftLive||{})[x.id]||null, mins=function(a){ var m=/^(\d{2}):(\d{2})/.exec(a||''); return m?(+m[1])*60+(+m[2]):null; };
+  var h='<div class="ftlv" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>🔴 Live'+(x.line?' · Linie '+esc(x.line):'')+'</b><button type="button" class="btn sm" style="margin-left:auto" data-a="ftlive" data-id="'+esc(x.id)+'"'+(L&&L.busy?' disabled':'')+'>'+(L&&L.busy?'Lädt …':L?'Aktualisieren':'Abfahrten anzeigen')+'</button></div>';
+  if(L&&L.msg) h+='<p class="hint err" style="margin:6px 0 0">'+esc(L.msg)+'</p>';
+  if(L&&L.deps){ h+=L.deps.length?'<div style="display:grid;gap:4px;margin-top:6px">'+L.deps.map(function(d){ var a=mins(d.t), b=mins(d.rt), dl=(a!==null&&b!==null)?b-a:null; if(dl!==null&&dl<-720) dl+=1440;
+      var st=d.x?'<b style="color:var(--danger,#d33)">fällt aus</b>':dl===null?'<small style="color:var(--ink-2)">ohne Echtzeit</small>':dl>0?'<b style="color:var(--danger,#d33)">+'+dl+' Min.</b>':'<b style="color:#1a9b45">pünktlich</b>';
+      return '<div style="display:flex;gap:8px;align-items:baseline'+(d.x?';text-decoration:line-through;opacity:.7':'')+'"><b style="min-width:44px">'+esc(d.t)+'</b><span style="flex:1;min-width:0">'+(x.line?'':esc(d.name)+' ')+'→ '+esc(d.dir)+'</span>'+st+'</div>'; }).join('')+'</div>':'<p class="hint" style="margin:6px 0 0">In den nächsten 3 Stunden keine Abfahrt'+(x.line?' der Linie '+esc(x.line):'')+'.</p>';
+    h+='<p class="hint" style="margin:6px 0 0">'+esc(x.extName||x.stop||'')+' · Stand '+esc(L.at||'')+' · Daten: RMV</p>'; }
+  return h+'</div>'; }
+function ftLiveRun(id){ var L0=ftList(), x=L0.filter(function(y){ return y.id===id; })[0]; if(!x) return; S.ftLive=S.ftLive||{}; var st=S.ftLive[id]={busy:true}; renderSheet();
+  var w=ftWorker(), done=function(o){ o.busy=false; S.ftLive[id]=o; renderSheet(); };
+  if(!w){ done({msg:'Der Cloudflare-Helfer ist auf diesem Gerät noch nicht eingetragen (Menü, Benachrichtigungen).'}); return; }
+  var post=function(o){ return fetch(w,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify(o)}).then(function(r){ return r.json(); }); };
+  var err=function(e){ return ({nokey:'Im Cloudflare-Helfer fehlt noch der RMV-Schlüssel.',API_AUTH:'RMV lehnt den Schlüssel ab.',kurz:'Bitte beim Eintrag eine Haltestelle angeben.',netz:'RMV ist gerade nicht erreichbar.'})[e]||('Fehler: '+e); };
+  var getExt=x.ext&&x.extFor===x.stop?Promise.resolve({id:x.ext,name:x.extName}):post({rmvq:x.stop||''}).then(function(r){ if(r.err) throw new Error(err(r.err)); var s0=(r.stops||[])[0]; if(!s0) throw new Error('Haltestelle „'+(x.stop||'')+'“ bei RMV nicht gefunden. Schreib sie genauer, zum Beispiel mit Ort davor.');
+      ftSaveList(ftList().map(function(y){ return y.id===id?Object.assign({},y,{ext:s0.id,extName:s0.name,extFor:y.stop}):y; })); return s0; });
+  getExt.then(function(s0){ return post({rmv:s0.id,line:x.line||''}).then(function(r){ if(r.err) throw new Error(err(r.err)); var n=new Date(); done({deps:r.deps||[],at:pad(n.getHours())+':'+pad(n.getMinutes())}); }); })
+    .catch(function(e){ done({msg:String(e&&e.message||'Keine Verbindung zum Helfer.').replace(/^Failed to fetch$/,'Keine Verbindung zum Helfer.')}); }); }
 function ftClick(a,t){
+  if(a==='ftlive'){ ftLiveRun(t.dataset.id); return true; }
   if(a==='ftnew'){ S.ftScan=null; S.ft={type:'bus',who:[],line:'',stop:'',hin:'',rueck:'',days:'',note:''}; renderSheet(); shTop(); return true; }
   if(a==='ftedit'){ S.ftScan=null; var x=ftList().filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.ft={id:x.id,type:x.type||'bus',who:(x.who||[]).slice(),line:x.line||'',stop:x.stop||'',hin:(x.hin||[]).join(', '),rueck:(x.rueck||[]).join(', '),days:x.days||'',note:x.note||'',trip:x.trip!=null?x.trip:15}; renderSheet(); shTop(); return true; }
   if(a==='fttype'){ ftGrab(); S.ft.type=t.dataset.v; renderSheet(); return true; }
@@ -2235,7 +2255,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='2.11.2026 · 19:52';
+var APPVER='4.11.2026 · 09:13';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
