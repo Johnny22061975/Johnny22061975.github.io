@@ -12,6 +12,15 @@ function errText(e){
 try {
   const [A, AU, F] = await Promise.all([import(B + 'firebase-app.js'), import(B + 'firebase-auth.js'), import(B + 'firebase-firestore.js')]);
   const app = A.initializeApp(window.FP_CONFIG);
+  // App Check (seit 2.11.2026 von Firebase für die KI-Auswertung verlangt).
+  // Der reCAPTCHA-Websiteschlüssel ist öffentlich und darf hier stehen.
+  const APPCHECK_KEY = window.FP_APPCHECK_KEY || '6LfCcxAuAAAAADWAmZVpbwhl_dg7xPjbQX_2G4MT';
+  const APPCHECK_TYPE = window.FP_APPCHECK_TYPE || 'v3'; // 'v3' (reCAPTCHA v3) oder 'enterprise'
+  let acReady = null;
+  if (APPCHECK_KEY) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
+    provider: APPCHECK_TYPE === 'enterprise' ? new AC.ReCaptchaEnterpriseProvider(APPCHECK_KEY) : new AC.ReCaptchaV3Provider(APPCHECK_KEY),
+    isTokenAutoRefreshEnabled: true
+  })).catch(e => { console.warn('App Check', e); return null; });
   const auth = AU.getAuth(app); auth.languageCode = 'de';
   let db;
   try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
@@ -37,7 +46,7 @@ try {
   const MODELS = [window.FP_MODEL, (() => { try { return localStorage.getItem('fp2_aimodel'); } catch (e) { return null; } })(), 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-flash-latest'].filter((x, i, a) => x && a.indexOf(x) === i);
   let aiM = null, ai = null; const models = {};
   async function getModel(name){
-    if (!aiM) { aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
+    if (!aiM) { if (acReady) await acReady; aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
     return models[name] || (models[name] = aiM.getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } }));
   }
   const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
@@ -53,6 +62,7 @@ try {
         catch (e) {
           const s = String((e && e.message) || e); last = s;
           if (/\b404\b|not found|not supported|is not available|no longer|retired|deprecated/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
+          if (/app ?check/i.test(s)) throw { code: 'failed', message: APPCHECK_KEY ? 'App Check lehnt ab. Ist die Seite johnny22061975.github.io beim reCAPTCHA-Schlüssel eingetragen und in Firebase registriert?' : 'Firebase verlangt seit 2.11.2026 App Check. Der reCAPTCHA-Schlüssel fehlt noch in der App.' };
           throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: name + ': ' + s.slice(-160) };
         }
       }
