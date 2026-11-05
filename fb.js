@@ -61,7 +61,7 @@ try {
         try { r = await (await getModel(name)).generateContent(parts); try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break; }
         catch (e) {
           const s = String((e && e.message) || e); last = s;
-          if (/\b404\b|not found|not supported|is not available|no longer|retired|deprecated/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
+          if (/\b404\b|\b50[0-4]\b|not found|not supported|is not available|no longer|retired|deprecated|high demand|overloaded|UNAVAILABLE|try again later/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
           if (/app ?check/i.test(s)) throw { code: 'failed', message: APPCHECK_KEY ? 'App Check lehnt ab. Ist die Seite johnny22061975.github.io beim reCAPTCHA-Schlüssel eingetragen und in Firebase registriert?' : 'Firebase verlangt seit 2.11.2026 App Check. Der reCAPTCHA-Schlüssel fehlt noch in der App.' };
           throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: name + ': ' + s.slice(-160) };
         }
