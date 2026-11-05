@@ -16,11 +16,13 @@ try {
   // Der reCAPTCHA-Websiteschlüssel ist öffentlich und darf hier stehen.
   const APPCHECK_KEY = window.FP_APPCHECK_KEY || '6LfwKBIuAAAAAGWmdQq4aSyzF33HiEIJ2AYZk0SU'; // Fraud Defense (reCAPTCHA Enterprise), Projekt familien-planner
   const APPCHECK_TYPE = window.FP_APPCHECK_TYPE || 'enterprise'; // 'enterprise' (Fraud Defense) oder 'v3'
-  let acReady = null;
+  let acReady = null, acInfo = APPCHECK_KEY ? 'startet' : 'aus';
   if (APPCHECK_KEY) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
     provider: APPCHECK_TYPE === 'enterprise' ? new AC.ReCaptchaEnterpriseProvider(APPCHECK_KEY) : new AC.ReCaptchaV3Provider(APPCHECK_KEY),
     isTokenAutoRefreshEnabled: true
-  })).catch(e => { console.warn('App Check', e); return null; });
+  })).then(ac => import(B + 'firebase-app-check.js').then(AC => AC.getToken(ac)).then(() => { acInfo = 'ok'; return ac; }, e => { acInfo = 'Token-Fehler: ' + String((e && e.message) || e).slice(0, 140); return ac; }))
+    .catch(e => { acInfo = 'Start-Fehler: ' + String((e && e.message) || e).slice(0, 140); console.warn('App Check', e); return null; });
+  window.FP_APPCHECK_INFO = () => acInfo;
   const auth = AU.getAuth(app); auth.languageCode = 'de';
   let db;
   try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
@@ -62,7 +64,7 @@ try {
         catch (e) {
           const s = String((e && e.message) || e); last = s;
           if (/\b404\b|\b50[0-4]\b|not found|not supported|is not available|no longer|retired|deprecated|high demand|overloaded|UNAVAILABLE|try again later/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
-          if (/app ?check/i.test(s)) throw { code: 'failed', message: APPCHECK_KEY ? 'App Check lehnt ab. Ist die Seite johnny22061975.github.io beim reCAPTCHA-Schlüssel eingetragen und in Firebase registriert?' : 'Firebase verlangt seit 2.11.2026 App Check. Der reCAPTCHA-Schlüssel fehlt noch in der App.' };
+          if (/app ?check/i.test(s)) throw { code: 'failed', message: 'App Check (' + APPCHECK_TYPE + ', ' + acInfo + '): ' + name + ': ' + s.slice(-120) };
           throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: name + ': ' + s.slice(-160) };
         }
       }
