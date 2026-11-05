@@ -14,8 +14,8 @@ try {
   const app = A.initializeApp(window.FP_CONFIG);
   // App Check (seit 2.11.2026 von Firebase für die KI-Auswertung verlangt).
   // Der reCAPTCHA-Websiteschlüssel ist öffentlich und darf hier stehen.
-  const APPCHECK_KEY = window.FP_APPCHECK_KEY || '6LfCcxAuAAAAADWAmZVpbwhl_dg7xPjbQX_2G4MT';
-  const APPCHECK_TYPE = window.FP_APPCHECK_TYPE || 'v3'; // 'v3' (reCAPTCHA v3) oder 'enterprise'
+  const APPCHECK_KEY = window.FP_APPCHECK_KEY || '6LfwKBIuAAAAAGWmdQq4aSyzF33HiEIJ2AYZk0SU'; // Fraud Defense (reCAPTCHA Enterprise), Projekt familien-planner
+  const APPCHECK_TYPE = window.FP_APPCHECK_TYPE || 'enterprise'; // 'enterprise' (Fraud Defense) oder 'v3'
   let acReady = null;
   if (APPCHECK_KEY) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
     provider: APPCHECK_TYPE === 'enterprise' ? new AC.ReCaptchaEnterpriseProvider(APPCHECK_KEY) : new AC.ReCaptchaV3Provider(APPCHECK_KEY),
