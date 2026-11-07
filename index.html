@@ -1373,6 +1373,7 @@ function bdaySel(v){ var p=v?v.split('-'):null, d=p?+p[2]:1, m=p?+p[1]:1, y=p&&+
 function helpSheetHTML(){
   var H=function(t,b){ return '<details><summary>'+t+'</summary><div>'+b+'</div></details>'; };
   return '<div class="sh-h"><h2>Hilfe & Tipps</h2><button class="icon-btn" data-a="close" aria-label="Schließen">'+ic('x')+'</button></div><div class="hlp">'
+  +pushHTML()
   +'<h3>So funktioniert’s</h3>'
   +H('📅 Kalender & Termine','<ul><li>Oben zwischen <b>Monat</b> und <b>Woche</b> wechseln. Tippe auf einen Tag, unten erscheinen alle Termine dieses Tages.</li><li><b>+ Termin</b>: zuerst „Für wen?“ wählen, dann Titel oder eine Kachel (z. B. Hausarzt, Banktermin), Datum und Uhrzeit.</li><li>Tipp: Sprich einen ganzen Satz ins Titelfeld (Mikrofon der Tastatur), z. B. „Freitag 15 Uhr Zahnarzt“, und tippe auf „✨ Satz auswerten“.</li><li>Bei <b>Wiederholen</b> stellst du ein, ob sich ein Termin jede Woche, alle 2–8 Wochen usw. wiederholt.</li></ul>')
   +H('✏️ Einen einzelnen Termin ändern','<ul><li>Tag antippen, dann den Termin antippen.</li><li>Bei wiederkehrenden Terminen oben <b>„Nur dieser Tag“</b> lassen: Uhrzeit, Datum oder Stunden ändern sich dann nur an diesem Tag, z. B. bei Vertretung.</li><li><b>„Ganze Serie“</b> ändert alle Termine dieser Reihe.</li></ul>')
@@ -1988,7 +1989,7 @@ function planFormInput(el){
     return;
   }
   if(el.dataset.pr==='c'){
-    var rc=pf.rows[+el.dataset.i]; rc.c=el.value;
+    var rc=pf.rows[+el.dataset.i]; rc.c=el.value; var sd0=shdGet(pf.k)[rc.c]; if(rc.c!=='-'&&sd0&&(sd0.a||sd0.b)){ rc.a=sd0.a||''; rc.b=sd0.b||''; }
     if(rc.c!=='-'&&!rc.a&&!rc.b){ pf.rows.some(function(o,q){ if(q!==+el.dataset.i&&o.c===rc.c&&(o.a||o.b)){ rc.a=o.a||''; rc.b=o.b||''; return true; } return false; }); }
     pf.text=rowsToText(pf); rerenderRows(); updatePlanLabels(); var pv0=$('#planPrev'); if(pv0) pv0.innerHTML=planPreviewHTML(); return; }
   else if(el.dataset.pr==='a') pf.rows[+el.dataset.i].a=el.value;
@@ -2016,7 +2017,7 @@ function planSheetHTML(){
     +((has&&!pf.edit)?planSummaryHTML(pf):'<div class="fld"><span class="lbl">Ablauf</span><div id="planRows">'+planRowsHTML(pf)+'</div></div>')
     +'<div id="planPrev">'+planPreviewHTML()+'</div>'
     +(pf.msg?'<p class="hint'+(/^Erkannt/.test(pf.msg)?' ok':' err')+'" role="alert">'+esc(pf.msg)+'</p>':'')
-    +shcHTML()+'<div class="btns">'+((has&&!pf.edit)?'<button type="button" class="btn pri grow" data-a="close">Fertig</button><button type="button" class="btn" data-a="planedit">Ablauf bearbeiten</button>':'<button type="button" class="btn pri grow" data-a="plansave">Speichern, Ablauf wiederholt sich ab hier</button>')+(has?'<button type="button" class="btn danger" data-a="plandel">Plan löschen</button>':'')+'<button type="button" class="btn" data-a="close">Abbrechen</button></div>';
+    +shdHTML(pf.k)+shcHTML()+'<div class="btns">'+((has&&!pf.edit)?'<button type="button" class="btn pri grow" data-a="close">Fertig</button><button type="button" class="btn" data-a="planedit">Ablauf bearbeiten</button>':'<button type="button" class="btn pri grow" data-a="plansave">Speichern, Ablauf wiederholt sich ab hier</button>')+(has?'<button type="button" class="btn danger" data-a="plandel">Plan löschen</button>':'')+'<button type="button" class="btn" data-a="close">Abbrechen</button></div>'+weckerOneHTML(pf.k);
 }
 function plansRaw(){ var raw={}; PEOPLE.forEach(function(k){ if(S.plans[k]) raw[k]={start:S.plans[k].start,seq:S.plans[k].seq,rows:S.plans[k].rows||[],cycN:S.plans[k].cycN||'',cycU:S.plans[k].cycU||'w'}; }); return raw; }
 function savePlan(){
@@ -2114,6 +2115,22 @@ function remPrefHTML(){ var h='<div class="panel" style="margin:0 0 12px"><b cla
    +'<div class="tabrow" style="gap:8px"><span style="min-width:0">Termine für „Allgemein“</span>'+sel('all',p.all)+'</div>'
    +'<label class="cb" style="display:flex;gap:10px;align-items:center;margin-top:6px"><input type="checkbox" data-rem="oth"'+(p.oth?' checked':'')+' style="width:22px;height:22px">Auch bei Terminen der anderen benachrichtigen</label>'
    +'<p class="hint">Erinnert wird nur bei Terminen, bei denen eine Erinnerung eingestellt ist. Der Haken „Bei mir als Wecker klingeln“ am Termin gilt immer nur für die Person, die ihn setzt.</p></div>'; }
+function weckerOneHTML(k){ var A=S.alarms||{}, codes=[['F','Frühschicht'],['S','Spätschicht'],['N','Nachtschicht'],['TD','Tagdienst']];
+  var h='<div class="panel" style="margin:14px 0 0"><b class="bpt">⏰ Schicht-Wecker für <span style="color:var(--p-'+k+')">'+esc(pname(k))+'</span></b>';
+  if(!hasShAlarm(k)) return h+'<p class="hint">Der Schicht-Wecker ist für '+esc(pname(k))+' aus. Einschalten: Menü → „Familie & Kalenderreihenfolge“ → ⚙ bei '+esc(pname(k))+'.</p></div>';
+  return h+'<p class="hint">Klingelt in der App auf dem Handy von '+esc(pname(k))+'. Bei geschlossener App kommt eine Benachrichtigung (einschalten unter Hilfe & Tipps). Mit 📱 stellst du die Zeit zusätzlich einmal im Handy-Wecker.</p>'
+   +codes.map(function(c){ var a=(A[k]||{})[c[0]]||{}, ed=S.alEdit===k+'|'+c[0];
+      return '<div class="tabrow" style="gap:8px"><span style="min-width:0">'+c[1]+'</span>'+(ed?'<div class="btw">'+timeSelects('al:'+k+':'+c[0],a.t||'05:00',true)+'<span>Uhr</span></div><button type="button" class="btn sm pri" data-a="aledit" data-v="">Fertig</button>'
+        :'<span style="flex:0 0 auto;color:var(--ink-2);font-size:14px">'+(a.on?'⏰ '+esc(a.t||'05:00'):'aus')+'</span><button type="button" class="btn sm" data-a="aledit" data-v="'+k+'|'+c[0]+'">Ändern</button>')
+        +'<input type="checkbox" data-alon="'+k+'|'+c[0]+'"'+(a.on?' checked':'')+' aria-label="Wecker an"></div>'; }).join('')+phoneAlarmHTML(k)
+   +'<div class="btns"><button type="button" class="btn sm" data-a="altest">🔔 Testklingeln</button></div></div>'; }
+// Standardzeiten pro Schichtart (jede Person für sich)
+function shdGet(k){ var r=k?(S.settingsRows||{})['shtime_'+k]:null; return (r&&typeof r==='object')?r:{}; }
+function shdHTML(k){ if(!k) return ''; var o=shdGet(k);
+  return '<div class="fld" style="margin-top:14px"><span class="lbl">Meine Standardzeiten · <span style="color:var(--p-'+k+')">'+esc(pname(k))+'</span></span>'
+   +[['F','Früh'],['S','Spät'],['N','Nacht'],['TD','Tagdienst']].map(function(c){ var v=o[c[0]]||{}; return '<div class="tabrow" style="gap:8px"><span style="flex:0 0 64px">'+c[1]+'</span><input type="time" data-shd="'+c[0]+'|a" value="'+esc(v.a||'')+'" style="flex:1 1 0;min-width:0;width:auto;padding:6px 4px"><span>bis</span><input type="time" data-shd="'+c[0]+'|b" value="'+esc(v.b||'')+'" style="flex:1 1 0;min-width:0;width:auto;padding:6px 4px"></div>'; }).join('')
+   +'<div class="btns"><button type="button" class="btn sm" data-a="shdapply">In alle Zeilen übernehmen</button></div><p class="hint">Einmal einstellen: Wählst du in einer Zeile Früh, Spät, Nacht oder Tagdienst, steht die Uhrzeit gleich drin. Jede Person hat ihre eigenen Zeiten.</p></div>'; }
+document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.shd||!S.planForm) return; e.stopImmediatePropagation(); var k=S.planForm.k, o=JSON.parse(JSON.stringify(shdGet(k))), p=el.dataset.shd.split('|'); o[p[0]]=o[p[0]]||{}; o[p[0]][p[1]]=el.value; S.settingsRows=S.settingsRows||{}; S.settingsRows['shtime_'+k]=o; saveSettings('shtime_'+k,o); },true);
 function weckerHTML(){ var act=activePeople().filter(hasShAlarm), A=S.alarms||{}, codes=[['F','Frühschicht'],['S','Spätschicht'],['N','Nachtschicht'],['TD','Tagdienst']];
   return remPrefHTML()+'<p class="hint">Die Erinnerungszeit stellst du direkt am Eintrag ein: bei jedem Termin unter „Erinnerung“ (auch eigene Zeit und „Bei mir als Wecker klingeln“), bei Geburtstagen im Adressbuch und bei den Tonnen. Hier stellst du die Wecker für Schichten ein.</p>'
    +'<div class="panel" style="margin:0"><b class="bpt">Wecker für Schichten</b><p class="hint">Klingelt in der App auf dem Handy der jeweiligen Person (Menü → „Familie“ → „Wer bist du?“). Bei geschlossener App kommt eine Benachrichtigung (oben einschalten). Mit 📱 stellst du die Zeit zusätzlich einmal im Handy-Wecker.</p>'
@@ -2352,7 +2369,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 19:00';
+var APPVER='7.11.2026 · 19:20';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2483,7 +2500,7 @@ function settingsSheetHTML(){
   if(!pg) return shHead('Menü',true)
     +'<div class="mlist">'
     +(S.fbUser&&!(S.settingsRows&&S.settingsRows.migrated)?'<label class="mrow filebtn" style="position:relative"><span class="mi">📦</span><span class="mt">Daten aus der Claude-Version übernehmen</span><span class="ms">Datei umzug.json wählen</span>'+ic('chevR',18)+'<input type="file" class="impfile" accept=".json,application/json"></label>':'')
-    +MENUP.filter(function(m){ return m[0]!=='fristen'; }).map(function(m){ return '<button type="button" class="mrow" data-a="mpage" data-v="'+m[0]+'"><span class="mi">'+m[1]+'</span><span class="mt">'+esc(m[2])+'</span><span class="ms">'+esc(menuSummary(m[0]))+'</span>'+ic('chevR',18)+'</button>'; }).join('')+'<button type="button" class="mrow" data-a="help"><span class="mi">❓</span><span class="mt">Hilfe & Tipps</span><span class="ms">Auch: Rückmeldung schicken</span>'+ic('chevR',18)+'</button></div>'
+    +MENUP.filter(function(m){ return m[0]!=='fristen'&&m[0]!=='wecker'; }).map(function(m){ return '<button type="button" class="mrow" data-a="mpage" data-v="'+m[0]+'"><span class="mi">'+m[1]+'</span><span class="mt">'+esc(m[2])+'</span><span class="ms">'+esc(menuSummary(m[0]))+'</span>'+ic('chevR',18)+'</button>'; }).join('')+'<button type="button" class="mrow" data-a="help"><span class="mi">❓</span><span class="mt">Hilfe & Tipps</span><span class="ms">Auch: Rückmeldung schicken</span>'+ic('chevR',18)+'</button></div>'
     +'<p class="hint" style="text-align:center;margin-top:10px">App-Version '+APPVER+'</p>'+(S.fbUser?'<div class="mlist"><button type="button" class="mrow" data-a="fblogout"><span class="mi">🚪</span><span class="mt">Abmelden</span><span class="ms">'+esc(S.fbUser.email)+'</span></button></div>':'');
   var title=(MENUP.filter(function(m){ return m[0]===pg; })[0]||['','','Menü'])[2], body='';
   if(pg==='darst') body='<div class="fld"><span class="lbl">Darstellung</span><div class="chips">'+[['light','Hell'],['dark','Dunkel'],['auto','Wie das Handy']].map(function(o){ return '<button type="button" class="chip" data-a="theme" data-v="'+o[0]+'" aria-pressed="'+(S.theme===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div></div>'+(function(){ var bv=parseFloat(lsGet('bwv')); if(!(bv>=0)) bv=({fine:1,normal:1.5,strong:2.5})[lsGet('contour')||'normal']||1.5; var cc=lsGet('ctcol')||'std', own=/^hsl/.test(cc), m=own?/hsl\((\d+),\s*\d+%,\s*(\d+)%\)/.exec(cc):null, hu=m?+m[1]:300, li=m?+m[2]:55; return '<div class="fld"><span class="lbl">Kontur · Dicke: <b id="bwvl">'+String(bv).replace('.',',')+' px</b></span><input type="range" id="bwr" min="0" max="5" step="0.5" value="'+bv+'" class="rng" aria-label="Rahmendicke"><div class="rngl"><span>dünn</span><span>dick</span></div></div>'+'<div class="fld"><span class="lbl">Kontur · Farbe</span><div class="chips">'+[['std','Standard'],['auto','Passend zum Farbstil'],['own','Eigene Farbe']].map(function(o){ return '<button type="button" class="chip" data-a="ctcol" data-v="'+o[0]+'" aria-pressed="'+(o[0]==='own'?own:cc===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div>'+(own?'<div class="ctprev" id="ctprev" style="border-color:'+cc+'">Vorschau</div><label class="lbl">Farbton</label><input type="range" id="cthue" min="0" max="360" value="'+hu+'" class="rng hue" aria-label="Farbton"><label class="lbl">Helligkeit</label><input type="range" id="ctlig" min="10" max="90" value="'+li+'" class="rng lig" style="--h:'+hu+'" aria-label="Helligkeit">':'')+'</div>'; })()
@@ -2523,7 +2540,7 @@ function settingsSheetHTML(){
   if(pg==='familie') body='<div class="fld"><span class="lbl">Sprache</span><div class="chips" data-noi18n>'+(window.FP_LANGS||[]).map(function(o){ return '<button type="button" class="chip" data-a="lang" data-v="'+o[0]+'" aria-pressed="'+(window.FP_LANG===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät. Eigene Einträge wie Termine und Nachrichten werden nicht übersetzt.</p></div>'+body;
   var meBlock=pg==='familie'?'<div class="fld"><span class="lbl">🙋 Wer bist du?</span><div class="chips">'+PEOPLE.filter(function(k){ return S.people[k].active; }).map(function(k){ return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="setme" data-k="'+k+'" aria-pressed="'+(S.me===k)+'"><i class="pd"></i>'+esc(pname(k))+'</button>'; }).join('')+'</div><p class="hint">Wähle aus, wer dieses Handy benutzt. Das merkt sich nur dieses Gerät.</p></div>':'';
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
-  if(meBlock) body=meBlock+body;
+  if(meBlock) body=meBlock+remPrefHTML()+body;
   return shHead(title)+body;
 }
 function shTop(){ var e=document.querySelector('.sheet'); if(e) e.scrollTop=0; }
@@ -2798,6 +2815,7 @@ document.addEventListener('click',function(e){
     case 'pltoggle': if(S.planForm){ var pfo=S.planForm; pfo.open=pfo.open||{}; pfo.open[+t.dataset.i]=!pfo.open[+t.dataset.i];
       if(pfo.open[+t.dataset.i]){ var rw0=pfo.rows[+t.dataset.i]; rw0.d=rw0.d||{}; for(var jj0=0;jj0<rw0.n;jj0++) if(!rw0.d[jj0]&&(rw0.a||rw0.b)) rw0.d[jj0]={a:rw0.a||'',b:rw0.b||''}; }
       rerenderRows(); } break;
+    case 'shdapply': if(S.planForm){ var sdo=shdGet(S.planForm.k), nch=0; S.planForm.rows.forEach(function(r){ var d=sdo[r.c]; if(r.c!=='-'&&d&&(d.a||d.b)){ r.a=d.a||''; r.b=d.b||''; nch++; } }); S.planForm.text=rowsToText(S.planForm); renderSheet(); toast(nch?'Uhrzeiten übernommen.':'Keine passende Standardzeit eingetragen.'); } break;
     case 'planaddrow': if(S.planForm){ S.planForm.rows.push({c:'-',n:2,a:'',b:''}); S.planForm.text=rowsToText(S.planForm); renderSheet(); } break;
     case 'plandelrow': if(S.planForm&&S.planForm.rows.length>1){ S.planForm.rows.splice(+t.dataset.i,1); S.planForm.open={}; S.planForm.text=rowsToText(S.planForm); renderSheet(); } break;
     case 'planwho': S.planForm=loadPlanForm(t.dataset.k); renderSheet(); break;
