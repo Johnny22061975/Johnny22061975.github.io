@@ -2171,45 +2171,71 @@ function ftPickOne(x,a,b){ var tr=x.trip!=null?+x.trip:15, hin=null, back=null;
   if(a!==null) (x.hin||[]).forEach(function(t){ var m=hm(t); if(m!==null&&m+tr<=a&&(!hin||m>hm(hin))) hin=t; });
   if(b!==null) (x.rueck||[]).forEach(function(t){ var m=hm(t); if(m!==null&&m-tr>=b&&(!back||m<hm(back))) back=t; });
   return {hin:hin,back:back}; }
-function ftNextDate(wd){ var d=new Date(); d.setHours(12,0,0,0); for(var n=0;n<8;n++){ var w=(d.getDay()+6)%7; if(w===wd&&n>0) break; if(w===wd&&n===0&&new Date().getHours()<20) break; d.setDate(d.getDate()+1); } return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
-function ftAutoAll(){ if(!S.ftAuto){ var o={}; try{ o=JSON.parse(lsGet('ftauto')||'{}')||{}; }catch(e){} S.ftAuto=o; } return S.ftAuto; }
-function ftAutoGet(x,wd,a,b){ var key=[x.id,x.stop||'',x.line||'',x.trip!=null?x.trip:15,wd,a,b].join('|'), all=ftAutoAll(), c=all[key], now=Date.now();
-  if(c&&!c.busy&&now-(c.at||0)<(c.err?3600000:5*86400000)) return c;
-  if(c&&c.busy&&now-(c.at||0)<60000) return c;
-  all[key]={busy:true,at:now}; ftAutoRun(x,wd,a,b,key); return all[key]; }
-function ftExtOf(x,post){ if(x.ext&&x.extFor===x.stop) return Promise.resolve({id:x.ext,name:x.extName});
-  return post({rmvq:x.stop||''}).then(function(r){ if(r.err) throw new Error(r.err); var s0=(r.stops||[])[0]; if(!s0) throw new Error('nf');
+function ftNextDate(wd){ var d=new Date(); d.setHours(12,0,0,0); for(var n=0;n<8;n++){ var w=(d.getDay()+6)%7; if(w===wd&&(n>0||new Date().getHours()<20)) break; d.setDate(d.getDate()+1); } return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function ftToday(){ var d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function ftTm(m){ m=Math.max(0,Math.min(1439,m)); return pad(Math.floor(m/60))+':'+pad(m%60); }
+function ftAutoAll(){ if(!S.ftAuto){ var o={}; try{ o=JSON.parse(lsGet('ftauto2')||'{}')||{}; }catch(e){} S.ftAuto=o; } return S.ftAuto; }
+function ftAutoSave(){ try{ var all=ftAutoAll(), o={}; Object.keys(all).forEach(function(k){ var c=all[k]; if(c&&!c.busy&&!c.err&&!c.live) o[k]=c; }); lsSet('ftauto2',JSON.stringify(o)); }catch(e){} }
+function ftPost(o){ var w=ftWorker(); if(!w) return Promise.reject(new Error('helfer')); return fetch(w,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify(o)}).then(function(r){ return r.json(); }); }
+function ftExtOf(x){ if(x.ext&&x.extFor===x.stop) return Promise.resolve({id:x.ext,name:x.extName});
+  return ftPost({rmvq:x.stop||''}).then(function(r){ if(r.err) throw new Error(r.err); var s0=(r.stops||[])[0]; if(!s0) throw new Error('nf');
     ftSaveList(ftList().map(function(y){ return y.id===x.id?Object.assign({},y,{ext:s0.id,extName:s0.name,extFor:y.stop}):y; })); return s0; }); }
-function ftAutoRun(x,wd,a,b,key){ var w=ftWorker(), all=ftAutoAll(), tr=x.trip!=null?+x.trip:15, date=ftNextDate(wd);
-  var fin=function(o){ o.at=Date.now(); all[key]=o; try{ lsSet('ftauto',JSON.stringify(all)); }catch(e){} if(typeof renderSchool==='function') renderSchool(); };
-  if(!w){ fin({err:'helfer'}); return; }
-  var post=function(o){ return fetch(w,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify(o)}).then(function(r){ return r.json(); }); };
-  var tm=function(m){ m=Math.max(0,Math.min(1439,m)); return pad(Math.floor(m/60))+':'+pad(m%60); };
-  ftExtOf(x,post).then(function(s0){
-    var qh=a!==null?post({rmv:s0.id,line:x.line||'',date:date,time:tm(a-tr-75),dur:75}):Promise.resolve(null);
-    var qb=b!==null?post({rmv:s0.id,line:x.line||'',date:date,time:tm(b+tr-5),dur:120,arr:1}):Promise.resolve(null);
-    return Promise.all([qh,qb]).then(function(rr){
-      var bad=rr.filter(function(r){ return r&&r.err; })[0]; if(bad) throw new Error(bad.err);
-      if(rr.some(function(r){ return r&&r.v!==4; })) throw new Error('alt');
-      var hin=null, back=null;
-      ((rr[0]&&rr[0].deps)||[]).forEach(function(d){ var m=hm(d.t); if(m!==null&&!d.x&&m+tr<=a&&(!hin||m>hm(hin))) hin=d.t; });
-      ((rr[1]&&rr[1].deps)||[]).forEach(function(d){ var m=hm(d.t); if(m!==null&&!d.x&&m>=b+tr&&(!back||m<hm(back))) back=d.t; });
-      fin({hin:hin,back:back,date:date}); }); })
-   .catch(function(e){ fin({err:String(e&&e.message||'netz')}); }); }
+function ftRedraw(){ clearTimeout(S.ftRdT); S.ftRdT=setTimeout(function(){ if(typeof renderSchool==='function') renderSchool(); },80); }
+function ftCached(key,ttl,errTtl,run){ var all=ftAutoAll(), c=all[key], now=Date.now();
+  if(c&&c.busy&&now-(c.at||0)<45000) return c;
+  if(c&&!c.busy&&now-(c.at||0)<(c.err?errTtl:ttl)) return c;
+  all[key]={busy:true,at:now}; run().then(function(o){ o.at=Date.now(); all[key]=o; ftAutoSave(); ftRedraw(); },function(e){ all[key]={err:String(e&&e.message||'netz'),at:Date.now()}; ftRedraw(); });
+  return c&&!c.err&&!c.busy?Object.assign({},c,{busy:true}):all[key]; }
+// Fahrplan (Soll-Zeiten) für einen Wochentag: Kandidaten für hin (vor Unterrichtsbeginn) und zurück (nach Schul-/Betreuungsende)
+function ftSched(x,wd,a,b){ var tr=x.trip!=null?+x.trip:15, date=ftNextDate(wd), key=['s',x.id,x.stop||'',x.line||'',tr,wd,a,b,date].join('|');
+  return ftCached(key,12*3600000,120000,function(){ return ftExtOf(x).then(function(s0){
+    var qh=a!==null?ftPost({rmv:s0.id,line:x.line||'',date:date,time:ftTm(a-tr-90),dur:100}):Promise.resolve({v:4,deps:[]});
+    var qb=b!==null?ftPost({rmv:s0.id,line:x.line||'',date:date,time:ftTm(b+tr),dur:150,arr:1}):Promise.resolve({v:4,deps:[]});
+    return Promise.all([qh,qb]).then(function(rr){ var bad=rr.filter(function(r){ return r&&r.err; })[0]; if(bad) throw new Error(bad.err); if(rr.some(function(r){ return !r||r.v!==4; })) throw new Error('alt');
+      var seen={}, uniq=function(d){ var k=d.t+'|'+d.dir; if(seen[k]) return false; seen[k]=1; return true; };
+      var hins=(rr[0].deps||[]).filter(function(d){ var m=hm(d.t); return m!==null&&m+tr<=a; }).filter(uniq).map(function(d){ return {t:d.t,dir:d.dir,line:d.line}; });
+      seen={}; var backs=(rr[1].deps||[]).filter(function(d){ var m=hm(d.t); return m!==null&&m>=b+tr; }).filter(uniq).map(function(d){ return {t:d.t,dir:d.dir,line:d.line}; });
+      var by=function(p,q){ return hm(p.t)-hm(q.t); }; hins.sort(by); backs.sort(by);
+      return {hins:hins,backs:backs,date:date}; }); }); }); }
+// Live-Zustand genau des gewählten Busses (nur für heute)
+function ftLiveSel(x,kind,sel){ var date=ftToday(), key=['l',x.id,x.stop||'',x.line||'',kind,sel.t,sel.dir||'',date].join('|');
+  return ftCached(key,60000,60000,function(){ return ftExtOf(x).then(function(s0){ return ftPost({rmv:s0.id,line:x.line||'',date:date,time:ftTm(hm(sel.t)-1),dur:20,arr:kind==='back'?1:0}).then(function(r){ if(r.err) throw new Error(r.err); if(r.v!==4) throw new Error('alt');
+    var L=r.deps||[], d=L.filter(function(z){ return z.t===sel.t&&(!sel.dir||z.dir===sel.dir); })[0]||L.filter(function(z){ return z.t===sel.t; })[0];
+    if(!d) return {live:1,st:'none'}; var dl=null; if(d.rt){ dl=hm(d.rt)-hm(d.t); if(dl<-720) dl+=1440; }
+    return {live:1,st:d.x?'x':dl===null?'noreal':dl>0?'late':'ok',dl:dl,rt:d.rt}; }); }); }); }
+function ftStHTML(r){ if(!r||r.busy&&!r.st) return ' <small>…</small>'; if(r.err) return '';
+  if(r.st==='x') return ' <b style="color:var(--danger,#d33)">fällt aus</b>'; if(r.st==='late') return ' <b style="color:var(--danger,#d33)">+'+r.dl+' Min.</b>';
+  if(r.st==='ok') return ' <b style="color:#1a9b45">pünktlich</b>'; if(r.st==='none') return ' <b style="color:var(--danger,#d33)">heute nicht im Fahrplan</b>'; return ' <small>ohne Echtzeit</small>'; }
+function ftSelOf(x,wd,kind){ var p=(x.pick||{})[wd]; return p&&p[kind]&&p[kind].t?p[kind]:null; }
 function ftDayHTML(k,wd,L){ var E=ftForKid(k); if(!E.length||!L.length) return ''; var st=L.map(function(l){ return l.start; }).filter(Boolean).sort(), en=L.map(function(l){ return l.end||l.start; }).filter(Boolean).sort();
-  var bt=betrGet(k)[wd]; if(bt){ en.push(bt); en.sort(); } var a=hm(st[0]), b=hm(en[en.length-1]);
-  var rows=E.map(function(x){ var p=ftPickOne(x,a,b), au=null;
-    if((!p.hin||!p.back)&&x.stop) au=ftAutoGet(x,wd,a,b);
-    var lab=function(own,auto){ if(own) return '<b>'+esc(own)+'</b>'; if(au&&au.busy) return '…'; if(auto) return '<b>'+esc(auto)+'</b>'; return '–'; };
-    var t=FTT[x.type]||FTT.bus;
-    return '<div class="ftrow">'+t[0]+' <span class="ftst">'+esc(x.stop||'')+(x.line?' · '+esc(x.line):'')+'</span> hin '+lab(p.hin,au&&au.hin)+' · zurück '+lab(p.back,au&&au.back)+'</div>'; }).join('');
-  var anyAuto=E.some(function(x){ var p=ftPickOne(x,a,b); return !p.hin||!p.back; });
+  var bt=betrGet(k)[wd]; if(bt){ en.push(bt); en.sort(); } var a=hm(st[0]), b=hm(en[en.length-1]), isToday=((new Date().getDay()+6)%7)===wd;
+  var info=E.map(function(x){ var sc=x.stop?ftSched(x,wd,a,b):null, own=ftPickOne(x,a,b);
+    var hins=(sc&&sc.hins)||(x.hin||[]).filter(function(t){ var m=hm(t); return m!==null&&m+(x.trip!=null?+x.trip:15)<=a; }).map(function(t){ return {t:t,dir:''}; });
+    var backs=(sc&&sc.backs)||(x.rueck||[]).filter(function(t){ var m=hm(t); return m!==null&&m-(x.trip!=null?+x.trip:15)>=b; }).map(function(t){ return {t:t,dir:''}; });
+    var sh=ftSelOf(x,wd,'hin'), sb=ftSelOf(x,wd,'back');
+    var hin=sh||(hins.length?hins[hins.length-1]:own.hin?{t:own.hin}:null), back=sb||(backs.length?backs[0]:own.back?{t:own.back}:null);
+    var gone=function(sel,list){ return sel&&sc&&!sc.busy&&!sc.err&&list.length&&!list.some(function(d){ return d.t===sel.t; }); };
+    return {x:x,sc:sc,hins:hins,backs:backs,hin:hin,back:back,sh:sh,sb:sb,gh:gone(sh,hins),gb:gone(sb,backs)}; });
+  var rows=info.map(function(o){ var t=FTT[o.x.type]||FTT.bus;
+    var lab=function(sel,kind,mine,gone){ if(!sel) return (o.sc&&o.sc.busy)?'…':'–'; var h='<b>'+esc(sel.t)+'</b>'+(mine?'':' <small>(auto)</small>');
+      if(gone) h+=' <b style="color:var(--danger,#d33)">⚠ Fahrplan geändert</b>';
+      else if(isToday&&mine){ var m=hm(sel.t), now=new Date().getHours()*60+new Date().getMinutes(); if(m!==null&&m>=now-10&&m<=now+180) h+=ftStHTML(ftLiveSel(o.x,kind,sel)); }
+      return h; };
+    return '<div class="ftrow">'+t[0]+' <span class="ftst">'+esc(o.x.stop||'')+(o.x.line?' · '+esc(o.x.line):'')+'</span> hin '+lab(o.hin,'hin',!!o.sh,o.gh)+' · zurück '+lab(o.back,'back',!!o.sb,o.gb)+'</div>'; }).join('');
   var h='<button type="button" class="ftday" data-a="ftday" data-wd="'+wd+'" aria-expanded="'+(S.ftDay===wd)+'">'+rows+'</button>';
-  if(S.ftDay===wd){ h+='<div class="ftdx"><p class="hint" style="margin:0 0 6px">Hin: letzter Bus, der vor '+esc(st[0]||'')+' ankommt. Zurück: erster Bus, der nach '+esc(en[en.length-1]||'')+(bt?' (Ende Betreuung)':'')+' an der Haltestelle ankommt. Eingeplant sind '+'jeweils die Fahrzeit aus dem Fahrplan-Eintrag (Standard 15 Min.).'+(anyAuto?' Ohne eigene Zeiten holt die App den festen Fahrplan bei RMV.':'')+'</p>'+E.map(function(x){ var t=FTT[x.type]||FTT.bus, p=ftPickOne(x,a,b);
-      return '<div><b>'+t[0]+' '+esc((x.line?x.line+' · ':'')+x.stop)+'</b>'+((x.hin||[]).length?'<div class="ftt"><b>Hin</b>'+(x.hin||[]).map(function(z){ return '<span'+(p.hin===z?' class="on"':'')+'>'+esc(z)+'</span>'; }).join('')+'</div>':'')+((x.rueck||[]).length?'<div class="ftt"><b>Zurück</b>'+(x.rueck||[]).map(function(z){ return '<span'+(p.back===z?' class="on"':'')+'>'+esc(z)+'</span>'; }).join('')+'</div>':'')+'</div>'; }).join('')
-      +(function(){ var errs=E.map(function(x){ var key=[x.id,x.stop||'',x.line||'',x.trip!=null?x.trip:15,wd,a,b].join('|'), c=ftAutoAll()[key]; return c&&c.err?c.err:c&&c.old?'alt':''; }).filter(Boolean);
-         if(!errs.length) return ''; var e=errs[0]; return '<p class="hint err">'+esc(e==='helfer'?'Der Cloudflare-Helfer ist auf diesem Gerät noch nicht eingetragen.':e==='nokey'?'Im Cloudflare-Helfer fehlt der RMV-Schlüssel.':e==='alt'||e==='id'?'Der Cloudflare-Helfer ist noch die alte Version. Bitte den neuen Helfer-Code einspielen, dann kommen die festen Fahrzeiten.':e==='nf'?'Haltestelle bei RMV nicht gefunden. Schreib sie genauer, mit Ort davor.':'RMV-Fahrplan gerade nicht abrufbar ('+e+').')+'</p>'; })()+'</div>'; }
+  if(S.ftDay===wd){
+    h+='<div class="ftdx"><p class="hint" style="margin:0 0 6px">Tippe deinen Bus an. Die App merkt ihn sich für diesen Tag, prüft ihn gegen den aktuellen RMV-Fahrplan und zeigt am Schultag live, ob er pünktlich ist. Hin: Busse, die mit '+esc(String(E[0].trip!=null?E[0].trip:15))+' Min. Fahrzeit vor '+esc(st[0]||'')+' ankommen. Zurück: Busse, die nach '+esc(en[en.length-1]||'')+(bt?' (Ende Betreuung)':'')+' an eurer Haltestelle ankommen.</p>'
+     +info.map(function(o){ var x=o.x, t=FTT[x.type]||FTT.bus;
+      var chips=function(list,kind,sel){ if(o.sc&&o.sc.busy&&!list.length) return '<span class="hint">Fahrplan wird geladen …</span>'; if(!list.length) return '<span class="hint">keine Fahrt gefunden</span>';
+        return list.map(function(d){ var on=sel&&sel.t===d.t&&(!sel.dir||!d.dir||sel.dir===d.dir); return '<button type="button" class="chip" style="padding:4px 8px;font-size:12px" data-a="ftsel" data-id="'+esc(x.id)+'" data-wd="'+wd+'" data-k="'+kind+'" data-t="'+esc(d.t)+'" data-dir="'+esc(d.dir||'')+'" aria-pressed="'+!!on+'">'+esc(d.t)+(d.dir?' <small>→ '+esc(d.dir.replace(/^Usingen[- ]/,''))+'</small>':'')+'</button>'; }).join(''); };
+      return '<div style="margin-top:6px"><b>'+t[0]+' '+esc((x.line?x.line+' · ':'')+x.stop)+'</b>'
+        +'<div class="fld" style="margin:4px 0"><span class="lbl">Hin</span><div class="chips">'+chips(o.hins,'hin',o.sh)+'</div></div>'
+        +'<div class="fld" style="margin:4px 0"><span class="lbl">Zurück</span><div class="chips">'+chips(o.backs,'back',o.sb)+'</div></div>'
+        +((o.sh||o.sb)?'<div class="btns"><button type="button" class="btn sm" data-a="ftselall" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Für Mo–Fr übernehmen</button><button type="button" class="btn sm" data-a="ftselx" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Auswahl löschen</button></div>':'')
+        +(o.sc&&o.sc.err?'<p class="hint err">'+esc(ftErrTxt(o.sc.err))+'</p>':'')+'</div>'; }).join('')+'</div>'; }
   return h; }
+function ftErrTxt(e){ return e==='helfer'?'Der Cloudflare-Helfer ist auf diesem Gerät noch nicht eingetragen.':e==='nokey'?'Im Cloudflare-Helfer fehlt der RMV-Schlüssel.':e==='alt'?'Der Cloudflare-Helfer ist noch die alte Version. Bitte den neuen Helfer-Code einspielen.':e==='nf'?'Haltestelle bei RMV nicht gefunden. Schreib sie genauer, mit Ort davor.':'RMV-Fahrplan gerade nicht abrufbar ('+e+'). Die App versucht es in 2 Minuten erneut.'; }
+function ftSetPick(id,fn){ ftSaveList(ftList().map(function(y){ if(y.id!==id) return y; var p=JSON.parse(JSON.stringify(y.pick||{})); fn(p); return Object.assign({},y,{pick:p}); })); ftRedraw(); }
 function ftScanHTML(){ var sc=S.ftScan, h='<div class="fld"><label class="btn sm filebtn">'+(sc&&sc.busy?'Wird ausgelesen …':'🔍 Fahrplan per Foto oder PDF auslesen')+'<input type="file" class="ftscan" accept="image/*,application/pdf,.pdf"'+(sc&&sc.busy?' disabled':'')+'></label>';
   if(sc&&sc.msg) h+='<p class="hint'+(sc.err?' err':'')+'">'+esc(sc.msg)+'</p>';
   if(sc&&sc.dirs&&sc.dirs.length) h+=sc.dirs.map(function(d,i){ return '<div class="ftc" style="margin:8px 0 0"><b>'+esc((d.line?'Linie '+d.line+' · ':'')+'Richtung '+(d.to||'?'))+'</b>'+(d.days?'<small>'+esc(d.days)+'</small>':'')+'<div class="ftt">'+d.times.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div><div class="btns"><button type="button" class="btn sm'+(d.used==='hin'?' pri':'')+'" data-a="ftuse" data-i="'+i+'" data-v="hin">Als Hinfahrt</button><button type="button" class="btn sm'+(d.used==='rueck'?' pri':'')+'" data-a="ftuse" data-i="'+i+'" data-v="rueck">Als Rückfahrt</button></div></div>'; }).join('')+'<div class="btns"><button type="button" class="btn sm" data-a="ftscanx">Ergebnis ausblenden</button></div>';
@@ -2272,6 +2298,9 @@ function ftClick(a,t){
   if(a==='ftuse'){ ftGrab(); var sc=S.ftScan, dr=sc&&sc.dirs[+t.dataset.i]; if(!dr) return true; var key=t.dataset.v; S.ft[key]=ftTimes(dr.times.join(',')).join(', '); if(!S.ft.days&&dr.days) S.ft.days=dr.days.slice(0,30); dr.used=key; renderSheet(); return true; }
   if(a==='ftscanx'){ S.ftScan=null; renderSheet(); return true; }
   if(a==='ftday'){ var wd=+t.dataset.wd; S.ftDay=S.ftDay===wd?null:wd; renderSchool(); return true; }
+  if(a==='ftsel'){ var d0=t.dataset, w0=+d0.wd; ftSetPick(d0.id,function(p){ var o=p[w0]=p[w0]||{}; if(o[d0.k]&&o[d0.k].t===d0.t&&(o[d0.k].dir||'')===(d0.dir||'')) delete o[d0.k]; else o[d0.k]={t:d0.t,dir:d0.dir||''}; }); return true; }
+  if(a==='ftselall'){ var w1=+t.dataset.wd; ftSetPick(t.dataset.id,function(p){ var src=JSON.parse(JSON.stringify(p[w1]||{})); [0,1,2,3,4].forEach(function(w){ p[w]=JSON.parse(JSON.stringify(src)); }); }); toast('Für Montag bis Freitag übernommen.'); return true; }
+  if(a==='ftselx'){ var w2=+t.dataset.wd; ftSetPick(t.dataset.id,function(p){ delete p[w2]; }); return true; }
   if(a==='ftviewx'){ S.ftView=''; renderSheet(); return true; }
   if(a==='ftphdel'){ ftGrab(); var pid=t.dataset.id; if(S.ftPhDel!==pid){ S.ftPhDel=pid; renderSheet(); return true; } S.ftPhDel=''; safe(function(){ return S.store.remove('citems',pid); }).then(function(){ setTimeout(renderSheet,200); }); return true; }
   return false; }
@@ -2313,7 +2342,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 17:45';
+var APPVER='7.11.2026 · 18:00';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -3131,7 +3160,6 @@ var BGSTYLES=[
  {k:'retro',l:'Retro',kind:'multi',tone:'mid',cols:[['#d4a017','#e8c35a','#b5860f'],['#1f6f78','#3f9aa3','#165259'],['#7a7a2e','#a3a352','#5c5c20'],['#8a2e3b','#b5525f','#6a1f2b'],['#6b4c9a','#a58bd0','#4d3573'],['#671e1e','#9e2e2e','#cd5151'],['#a55c1d','#da7f2f','#e7aa74'],['#4c7114','#74ad1f','#9fdd40'],['#64d025','#8ce25a','#bceea0'],['#207114','#32ad1f','#55dd40'],['#2c964f','#41c86e','#81da9e'],['#37be83','#69d3a5','#a8e6cb'],['#1da0a5','#2fd5da','#74e3e7'],['#257ad0','#5a9ee2','#a0c7ee']]},
  {k:'ozean',l:'Ozean',kind:'multi',tone:'mid',cols:[['#0b3b6f','#2a6fb0','#062a52'],['#1fb5b0','#7fe0dc','#138f8b'],['#e05a46','#ff9f8f','#c4412f'],['#3c5566','#6a8698','#283b48'],['#5fa8d3','#d6ecf9','#3d7fae'],['#ff6f91','#ffc2d1','#d9446a'],['#163b2f','#2a6f58','#41aa87'],['#1d7256','#2bab81','#54d4a9'],['#2aa78a','#47d1b1','#89e1cd'],['#3b6cce','#7497dc','#b6c8ed'],['#101c41','#1f347a','#2f50bc'],['#3b1d16','#6f362a','#aa5241'],['#98493a','#c06a59','#d69f94'],['#98853a','#c0ab59','#d6c994']]},
  {k:'sunset',l:'Sonnenuntergang',kind:'multi',tone:'mid',cols:[['#ff7e3d','#ff4f8b','#7b3fd0'],['#f9a423','#ff6f3c','#d6336c'],['#fa709a','#f6b83a','#ff8c42'],['#355c7d','#c06c84','#f67280'],['#2b1055','#7597de','#d86fa6'],['#fe8c00','#f83600','#c33764'],['#ffafbd','#ffc3a0','#e8798a'],['#1a2a6c','#b21f1f','#fdbb2d'],['#ee9ca7','#ffdde1','#d4737f'],['#864418','#c36322','#e18e56'],['#611886','#8e22c3','#b356e1'],['#a12fda','#bd6ce5','#dcb1f1'],['#920c89','#d411c7','#f047e5'],['#861853','#c32278','#e156a0']]},
- {k:'marmor',l:'Marmor',kind:'marmor',tone:'mid',cols:[['#1a1a1f','#d9d9de','#0b0b0e'],['#14213d','#c9d6ea','#0a1224'],['#2b2f36','#b8bcc4','#1b1e23'],['#1f3b35','#bfd8cf','#0f2620'],['#3a1f2b','#e3c6cf','#22121a'],['#f2efe9','#8c8680','#dcd6cc'],['#e9e1d3','#b59f7e','#d5c8b0'],['#d8dde3','#7b8794','#c4cbd3'],['#2d3a4a','#9fb2c7','#1c2634'],['#4a4f58','#dfe3e8','#30343b'],['#0f2e3d','#7fb6c6','#081c26'],['#5a3a2a','#e0c3a0','#3a2418'],['#f5f3f0','#2a2a2a','#e3e0da'],['#101418','#c4a46a','#07090c']]},
  {k:'edel',l:'Edel',kind:'edel',tone:'dark',cols:[['#111111','#c9a227','#1a1a1a'],['#3d0a12','#c9a227','#2a060c'],['#0b2e22','#c9a227','#071f17'],['#2a0e3a','#b08cd0','#160620'],['#3b3b58','#c8c8e0','#22223a'],['#433737','#6b5757','#957e7e'],['#5a4949','#816a6a','#a89494'],['#592222','#8d3535','#be5555'],['#832121','#bc2f2f','#d86464'],['#763f2d','#aa5b41','#ca8872'],['#3b3216','#6f5e2a','#aa9041'],['#76642d','#aa9041','#cab472'],['#838321','#bcbc2f','#d8d864'],['#4b5922','#778d35','#a4be55']]},
  {k:'logo',l:'Logo',kind:'logo',tone:'dark',names:['Schiefer','Schwarz-Gold','Rot-Gold','Blau-Silber','Grün-Gold','Weinrot-Creme','Türkis-Gold','Violett-Silber','Kupfer','Mitternacht','Waldgrün','Sand-Braun','Smaragd-Gold','Bordeaux-Silber'],
   cols:[['#3c4854','#e8eef3','#222a33'],['#15161a','#d9b24a','#07080a'],['#0a1020','#8fa8d8','#050812'],['#143a1e','#9bd08a','#081f10'],['#4a3a26','#e0cba8','#281e14'],['#241414','#532d2d','#884949'],['#774040','#a65959','#c28e8e'],['#9f5656','#bb8181','#d8b6b6'],['#561515','#8f2424','#cd3737'],['#932525','#cc3333','#dc7474'],['#c43131','#d86464','#e9a5a5'],['#463625','#74593e','#a8825d'],['#935c25','#cc8033','#dca874'],['#777740','#a6a659','#c2c28e']]},
@@ -3147,38 +3175,12 @@ function logoBg(c){
     +'<rect width="1000" height="1700" fill="url(#g)"/>'
     +'<g opacity="0.34" transform="translate(500 850) scale(1.35) translate(-256 -256)">'+LOGOMARK.split('@I@').join(c[1])+'</g></svg>';
   return "url('data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg).replace(/'/g,'%27').replace(/"/g,'%22')+"')"; }
-var MARMC={};
-function marmorBg(c,i){ var key=c.join(',')+'|'+i; if(MARMC[key]) return MARMC[key];
-  var sd=(i+1)*2654435761%4294967296, rnd=function(){ sd=(sd+0x6D2B79F5)|0; var t=Math.imul(sd^(sd>>>15),1|sd); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; };
-  var W=1000,H=1700, out=[], soft=[];
-  var vein=function(x,y,ang,len,w,col,depth){ var px=x,py=y, ww=w;
-    for(var n=0;n<len;n++){ ang+=(rnd()-.5)*1.1; var step=30+rnd()*70, nx=px+Math.cos(ang)*step, ny=py+Math.sin(ang)*step;
-      ww=Math.max(.6,Math.min(w*1.8,ww+(rnd()-.5)*w*.9));
-      out.push('<path d="M'+px.toFixed(0)+' '+py.toFixed(0)+'L'+nx.toFixed(0)+' '+ny.toFixed(0)+'" stroke="'+col+'" stroke-width="'+ww.toFixed(1)+'"/>');
-      if(depth<2&&rnd()<.16) vein(nx,ny,ang+(rnd()<.5?-1:1)*(.5+rnd()*.7),4+Math.floor(rnd()*8),Math.max(.8,w*.5),col,depth+1);
-      px=nx; py=ny; if(px<-200||px>W+200||py<-200||py>H+200) break; } };
-  var edge=function(){ var e=Math.floor(rnd()*4); return e===0?[rnd()*W,-20,Math.PI/2]:e===1?[W+20,rnd()*H,Math.PI]:e===2?[rnd()*W,H+20,-Math.PI/2]:[-20,rnd()*H,0]; };
-  for(var v=0;v<5;v++){ var e=edge(); vein(e[0],e[1],e[2]+(rnd()-.5)*.9,22+Math.floor(rnd()*14),2+rnd()*5,v<3?c[1]:c[2],0); }
-  var main=out.join(''); out=[];
-  for(var v2=0;v2<4;v2++){ var e2=edge(); vein(e2[0],e2[1],e2[2]+(rnd()-.5)*1.2,16+Math.floor(rnd()*10),.8+rnd()*1.4,c[1],1); }
-  var fine=out.join('');
-  var hx=function(h,k){ return (parseInt(h.substr(1+k*2,2),16)/255).toFixed(3); };
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid slice">'
-    +'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+c[0]+'"/><stop offset="1" stop-color="'+c[2]+'"/></linearGradient>'
-    +'<filter id="n" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.0035 0.009" numOctaves="4" seed="'+(i+3)+'"/><feColorMatrix values="0 0 0 0 '+hx(c[1],0)+' 0 0 0 0 '+hx(c[1],1)+' 0 0 0 0 '+hx(c[1],2)+' 0 0 0 1.1 -0.45"/></filter>'
-    +'<filter id="b"><feGaussianBlur stdDeviation="9"/></filter><filter id="b2"><feGaussianBlur stdDeviation="1.2"/></filter></defs>'
-    +'<rect width="'+W+'" height="'+H+'" fill="url(#g)"/><rect width="'+W+'" height="'+H+'" filter="url(#n)" opacity=".55"/>'
-    +'<g fill="none" stroke-linecap="round" opacity=".45" filter="url(#b)" transform="scale(1)">'+main.replace(/stroke-width="([\d.]+)"/g,function(m,a){ return 'stroke-width="'+(+a*4).toFixed(1)+'"'; })+'</g>'
-    +'<g fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".9" filter="url(#b2)">'+main+'</g>'
-    +'<g fill="none" stroke-linecap="round" opacity=".6">'+fine+'</g></svg>';
-  return MARMC[key]="url('data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg).replace(/'/g,'%27').replace(/"/g,'%22')+"')"; }
 function dkc(c,p){ return 'color-mix(in srgb,'+c+' '+p+'%,#0b0e13)'; }
 function bgTriple(st,i,dark){ var c=sCols(st)[i]; if(!c) return null; if(Array.isArray(c[0])) return c[dark?1:0]; if(!dark||st.tone==='dark') return c; var p=st.tone==='light'?32:55; return [dkc(c[0],p),dkc(c[1],p),dkc(c[2],p)]; }
 function bgImage(st,c,i){
   if(st.kind==='logo') return logoBg(c);
   if(st.kind==='metal') return metal(c);
   if(st.kind==='neon') return 'radial-gradient(circle at 18% 12%,'+c[1]+' 0%,transparent 42%),radial-gradient(circle at 85% 78%,'+c[2]+' 0%,transparent 46%),radial-gradient(circle at 60% 40%,color-mix(in srgb,'+c[1]+' 35%,transparent) 0%,transparent 30%),linear-gradient('+c[0]+','+c[0]+')';
-  if(st.kind==='marmor') return marmorBg(c,i||0);
   if(st.kind==='edel') return 'linear-gradient(135deg,'+c[0]+' 0%,'+c[2]+' 36%,color-mix(in srgb,'+c[1]+' 70%,'+c[0]+') 50%,'+c[2]+' 64%,'+c[0]+' 100%)';
   if(st.kind==='matt'){ var g='linear-gradient(170deg,'+c[1]+' 0%,'+c[0]+' 55%,'+c[2]+' 100%)'; if(st.wood&&st.wood.indexOf(i)>-1) g='repeating-linear-gradient(92deg,transparent 0 22px,color-mix(in srgb,'+c[2]+' 45%,transparent) 22px 24px,transparent 24px 41px,color-mix(in srgb,'+c[2]+' 30%,transparent) 41px 42px),'+g; return g; }
   return 'linear-gradient(160deg,'+c[0]+' 0%,'+c[1]+' 52%,'+c[2]+' 100%)';
