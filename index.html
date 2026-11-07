@@ -2011,12 +2011,12 @@ function planSheetHTML(){
   var pf=S.planForm, act=activePeople(), has=!!S.plans[pf.k];
   return '<div class="sh-h"><h2>Schichtplan</h2><div class="shr"><button type="button" class="icon-btn menu-btn" data-a="scanfrom" aria-label="Foto auswerten">'+ic('camera',20)+'Foto</button><button class="icon-btn" data-a="close" aria-label="Schließen">'+ic('x')+'</button></div></div>'
     +'<div class="fld"><span class="lbl">Für wen?</span><div class="chips">'+act.map(function(k){ return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="planwho" data-k="'+k+'" aria-pressed="'+(pf.k===k)+'"><i class="pd"></i>'+esc(pname(k))+'</button>'; }).join('')+'</div></div>'
-    +'<div class="seg segtop" role="group" aria-label="Art"><button type="button" data-a="openev" aria-pressed="false">Termin</button><button type="button" data-a="plan" aria-pressed="true">Schichtplan</button></div>'
+    +'<div class="seg segtop" role="group" aria-label="Art"><button type="button" data-a="openev" aria-pressed="false">Termin</button><button type="button" data-a="plan" aria-pressed="true">Schichtplan</button><button type="button" data-a="mpage" data-v="fristen">Fristen & Verträge</button></div>'
     +((S.sample&&(!has||pf.edit))?'<div class="fld"><label class="lbl" for="plantext">Ablauf sprechen oder tippen</label><textarea id="plantext" rows="2" maxlength="400" placeholder="z. B. ab 1. Oktober 5 Tage Frühdienst von 6 bis 14 Uhr, dann 2 Tage frei">'+esc(pf.nl||'')+'</textarea><div class="btns"><button type="button" class="btn" data-a="plannl"'+(pf.busy?' disabled':'')+'>'+(pf.busy?'Moment …':'✨ In Zeilen umwandeln')+'</button></div></div>':'')
     +((has&&!pf.edit)?planSummaryHTML(pf):'<div class="fld"><span class="lbl">Ablauf</span><div id="planRows">'+planRowsHTML(pf)+'</div></div>')
     +'<div id="planPrev">'+planPreviewHTML()+'</div>'
     +(pf.msg?'<p class="hint'+(/^Erkannt/.test(pf.msg)?' ok':' err')+'" role="alert">'+esc(pf.msg)+'</p>':'')
-    +'<div class="btns">'+((has&&!pf.edit)?'<button type="button" class="btn pri grow" data-a="close">Fertig</button><button type="button" class="btn" data-a="planedit">Ablauf bearbeiten</button>':'<button type="button" class="btn pri grow" data-a="plansave">Speichern, Ablauf wiederholt sich ab hier</button>')+(has?'<button type="button" class="btn danger" data-a="plandel">Plan löschen</button>':'')+'<button type="button" class="btn" data-a="close">Abbrechen</button></div>';
+    +shcHTML()+'<div class="btns">'+((has&&!pf.edit)?'<button type="button" class="btn pri grow" data-a="close">Fertig</button><button type="button" class="btn" data-a="planedit">Ablauf bearbeiten</button>':'<button type="button" class="btn pri grow" data-a="plansave">Speichern, Ablauf wiederholt sich ab hier</button>')+(has?'<button type="button" class="btn danger" data-a="plandel">Plan löschen</button>':'')+'<button type="button" class="btn" data-a="close">Abbrechen</button></div>';
 }
 function plansRaw(){ var raw={}; PEOPLE.forEach(function(k){ if(S.plans[k]) raw[k]={start:S.plans[k].start,seq:S.plans[k].seq,rows:S.plans[k].rows||[],cycN:S.plans[k].cycN||'',cycU:S.plans[k].cycU||'w'}; }); return raw; }
 function savePlan(){
@@ -2066,7 +2066,7 @@ function eventSheetHTML(){
   }
   return '<div class="sh-h"><h2>'+(f.id?'Termin ändern':'Neuer Termin')+'</h2><div class="shr"><button type="button" class="icon-btn menu-btn" data-a="scanfrom" aria-label="Foto auswerten">'+ic('camera',20)+'Foto</button><button class="icon-btn" data-a="close" aria-label="Schließen">'+ic('x')+'</button></div></div>'
         +scopeSeg+'<div class="fld" id="whoBox">'+whoHTML()+'</div>'
-+(f.id?'':'<div class="seg segtop" role="group" aria-label="Art"><button type="button" data-a="openev" aria-pressed="true">Termin</button><button type="button" data-a="plan" aria-pressed="false">Schichtplan</button></div>')
++(f.id?'':'<div class="seg segtop" role="group" aria-label="Art"><button type="button" data-a="openev" aria-pressed="true">Termin</button><button type="button" data-a="plan" aria-pressed="false">Schichtplan</button><button type="button" data-a="mpage" data-v="fristen">Fristen & Verträge</button></div>')
     +quick
     +'<div class="fld"><label class="lbl" for="f-title">Titel</label>'
     +'<div class="tin"><input type="text" id="f-title" data-f="title" value="'+esc(f.title)+'" maxlength="160" placeholder="Eintippen oder unten wählen" autocomplete="off"></div>'
@@ -2352,7 +2352,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 18:30';
+var APPVER='7.11.2026 · 18:50';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2483,7 +2483,7 @@ function settingsSheetHTML(){
   if(!pg) return shHead('Menü',true)
     +'<div class="mlist">'
     +(S.fbUser&&!(S.settingsRows&&S.settingsRows.migrated)?'<label class="mrow filebtn" style="position:relative"><span class="mi">📦</span><span class="mt">Daten aus der Claude-Version übernehmen</span><span class="ms">Datei umzug.json wählen</span>'+ic('chevR',18)+'<input type="file" class="impfile" accept=".json,application/json"></label>':'')
-    +MENUP.map(function(m){ return '<button type="button" class="mrow" data-a="mpage" data-v="'+m[0]+'"><span class="mi">'+m[1]+'</span><span class="mt">'+esc(m[2])+'</span><span class="ms">'+esc(menuSummary(m[0]))+'</span>'+ic('chevR',18)+'</button>'; }).join('')+'<button type="button" class="mrow" data-a="help"><span class="mi">❓</span><span class="mt">Hilfe & Tipps</span><span class="ms">Auch: Rückmeldung schicken</span>'+ic('chevR',18)+'</button></div>'
+    +MENUP.filter(function(m){ return m[0]!=='fristen'; }).map(function(m){ return '<button type="button" class="mrow" data-a="mpage" data-v="'+m[0]+'"><span class="mi">'+m[1]+'</span><span class="mt">'+esc(m[2])+'</span><span class="ms">'+esc(menuSummary(m[0]))+'</span>'+ic('chevR',18)+'</button>'; }).join('')+'<button type="button" class="mrow" data-a="help"><span class="mi">❓</span><span class="mt">Hilfe & Tipps</span><span class="ms">Auch: Rückmeldung schicken</span>'+ic('chevR',18)+'</button></div>'
     +'<p class="hint" style="text-align:center;margin-top:10px">App-Version '+APPVER+'</p>'+(S.fbUser?'<div class="mlist"><button type="button" class="mrow" data-a="fblogout"><span class="mi">🚪</span><span class="mt">Abmelden</span><span class="ms">'+esc(S.fbUser.email)+'</span></button></div>':'');
   var title=(MENUP.filter(function(m){ return m[0]===pg; })[0]||['','','Menü'])[2], body='';
   if(pg==='darst') body='<div class="fld"><span class="lbl">Darstellung</span><div class="chips">'+[['light','Hell'],['dark','Dunkel'],['auto','Wie das Handy']].map(function(o){ return '<button type="button" class="chip" data-a="theme" data-v="'+o[0]+'" aria-pressed="'+(S.theme===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div></div>'+'<div class="fld"><span class="lbl">Personen im Kästchen (Monat und Woche)</span><div class="chips">'+[['col','Untereinander'],['row','Nebeneinander']].map(function(o){ return '<button type="button" class="chip" data-a="shlay" data-v="'+o[0]+'" aria-pressed="'+(shLay()===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Untereinander: jede Person bekommt in jedem Kästchen ihre eigene Zeile mit Schicht und Terminen, dazu eine Zeile für die Müllabfuhr.</p>'+'</div>'+(function(){ var bv=parseFloat(lsGet('bwv')); if(!(bv>=0)) bv=({fine:1,normal:1.5,strong:2.5})[lsGet('contour')||'normal']||1.5; var cc=lsGet('ctcol')||'std', own=/^hsl/.test(cc), m=own?/hsl\((\d+),\s*\d+%,\s*(\d+)%\)/.exec(cc):null, hu=m?+m[1]:300, li=m?+m[2]:55; return '<div class="fld"><span class="lbl">Kontur · Dicke: <b id="bwvl">'+String(bv).replace('.',',')+' px</b></span><input type="range" id="bwr" min="0" max="5" step="0.5" value="'+bv+'" class="rng" aria-label="Rahmendicke"><div class="rngl"><span>dünn</span><span>dick</span></div></div>'+'<div class="fld"><span class="lbl">Kontur · Farbe</span><div class="chips">'+[['std','Standard'],['auto','Passend zum Farbstil'],['own','Eigene Farbe']].map(function(o){ return '<button type="button" class="chip" data-a="ctcol" data-v="'+o[0]+'" aria-pressed="'+(o[0]==='own'?own:cc===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div>'+(own?'<div class="ctprev" id="ctprev" style="border-color:'+cc+'">Vorschau</div><label class="lbl">Farbton</label><input type="range" id="cthue" min="0" max="360" value="'+hu+'" class="rng hue" aria-label="Farbton"><label class="lbl">Helligkeit</label><input type="range" id="ctlig" min="10" max="90" value="'+li+'" class="rng lig" style="--h:'+hu+'" aria-label="Helligkeit">':'')+'</div>'; })()
@@ -2495,7 +2495,7 @@ function settingsSheetHTML(){
       +(ui.eigen?(function(){ var ec=eigenCols()[0]; return '<div class="eigw">'+[['Grundfarbe',0],['Mitte',1],['Zweite Farbe',2]].map(function(o){ return '<label class="eigc"><span>'+o[0]+'</span><input type="color" data-eig="'+o[1]+'" value="'+ec[o[1]]+'"></label>'; }).join('')+'</div><p class="hint">Such dir drei Farben aus. Das Feld oben ändert sich sofort mit. Tipp danach darauf, damit die Farben übernommen werden.</p>'; })():'')
       +'</div>'; }
   else if(pg==='wecker') body=pushHTML()+weckerHTML();
-  if(pg==='darst') body+=shcHTML();
+  if(pg==='darst') body+='';
   else if(pg==='fahrt') body=ftHTML();
   else if(pg==='kasse') body=kasseHTML();
   else if(pg==='vorrat') body=vorratHTML();
