@@ -2197,45 +2197,52 @@ function ftSched(x,wd,a,b){ var tr=x.trip!=null?+x.trip:15, date=ftNextDate(wd),
       seen={}; var backs=(rr[1].deps||[]).filter(function(d){ var m=hm(d.t); return m!==null&&m>=b+tr; }).filter(uniq).map(function(d){ return {t:d.t,dir:d.dir,line:d.line}; });
       var by=function(p,q){ return hm(p.t)-hm(q.t); }; hins.sort(by); backs.sort(by);
       return {hins:hins,backs:backs,date:date}; }); }); }); }
-// Live-Zustand genau des gewählten Busses (nur für heute)
-function ftLiveSel(x,kind,sel){ var date=ftToday(), key=['l',x.id,x.stop||'',x.line||'',kind,sel.t,sel.dir||'',date].join('|');
-  return ftCached(key,60000,60000,function(){ return ftExtOf(x).then(function(s0){ return ftPost({rmv:s0.id,line:x.line||'',date:date,time:ftTm(hm(sel.t)-1),dur:20,arr:kind==='back'?1:0}).then(function(r){ if(r.err) throw new Error(r.err); if(r.v!==4) throw new Error('alt');
+// Live-Zustand genau des gewählten Busses (heute live, sonst Prüfung gegen den Fahrplan des nächsten Schultags)
+function ftLiveKey(x,kind,sel,date){ return ['l',x.id,x.stop||'',x.line||'',kind,sel.t,sel.dir||'',date].join('|'); }
+function ftLiveSel(x,kind,sel,date){ date=date||ftToday(); var key=ftLiveKey(x,kind,sel,date);
+  return ftCached(key,60000,30000,function(){ return ftExtOf(x).then(function(s0){ return ftPost({rmv:s0.id,line:x.line||'',date:date,time:ftTm(hm(sel.t)-1),dur:20,arr:kind==='back'?1:0}).then(function(r){ if(r.err) throw new Error(r.err); if(r.v!==4) throw new Error('alt');
     var L=r.deps||[], d=L.filter(function(z){ return z.t===sel.t&&(!sel.dir||z.dir===sel.dir); })[0]||L.filter(function(z){ return z.t===sel.t; })[0];
     if(!d) return {live:1,st:'none'}; var dl=null; if(d.rt){ dl=hm(d.rt)-hm(d.t); if(dl<-720) dl+=1440; }
-    return {live:1,st:d.x?'x':dl===null?'noreal':dl>0?'late':'ok',dl:dl,rt:d.rt}; }); }); }); }
-function ftStHTML(r){ if(!r||r.busy&&!r.st) return ' <small>…</small>'; if(r.err) return '';
-  if(r.st==='x') return ' <b style="color:var(--danger,#d33)">fällt aus</b>'; if(r.st==='late') return ' <b style="color:var(--danger,#d33)">+'+r.dl+' Min.</b>';
-  if(r.st==='ok') return ' <b style="color:#1a9b45">pünktlich</b>'; if(r.st==='none') return ' <b style="color:var(--danger,#d33)">heute nicht im Fahrplan</b>'; return ' <small>ohne Echtzeit</small>'; }
+    return {live:1,st:d.x?'x':dl===null?'noreal':dl>0?'late':'ok',dl:dl,rt:d.rt,dir:d.dir}; }); }); }); }
+function ftStHTML(r,today){ if(!r||r.busy&&!r.st) return '<span class="hint">wird geprüft …</span>'; if(r.err) return '<b style="color:var(--danger,#d33)">'+esc(ftErrTxt(r.err))+'</b>';
+  if(r.st==='x') return '<b style="color:var(--danger,#d33)">❌ Fällt aus!</b>';
+  if(r.st==='late') return '<b style="color:var(--danger,#d33)">⏱️ '+r.dl+' Min. Verspätung</b> <small>(kommt '+esc(r.rt)+')</small>';
+  if(r.st==='ok') return '<b style="color:#1a9b45">✅ Alles in Ordnung, Bus kommt pünktlich.</b>';
+  if(r.st==='none') return '<b style="color:var(--danger,#d33)">⚠ Dieser Bus steht '+(today?'heute':'an dem Tag')+' nicht im Fahrplan.</b>';
+  return today?'<b style="color:#1a9b45">✅ Bus fährt laut Fahrplan.</b> <small>Echtzeit gibt es erst kurz vor der Abfahrt.</small>':'<b style="color:#1a9b45">✅ Bus fährt laut Fahrplan.</b> <small>Live-Daten gibt es am Schultag kurz vor der Abfahrt.</small>'; }
 function ftSelOf(x,wd,kind){ var p=(x.pick||{})[wd]; return p&&p[kind]&&p[kind].t?p[kind]:null; }
+function ftDraftOf(x,wd,kind){ var d=(S.ftDraft||{})[x.id+'|'+wd]; return d&&d[kind]!==undefined?d[kind]:undefined; }
 function ftDayHTML(k,wd,L){ var E=ftForKid(k); if(!E.length||!L.length) return ''; var st=L.map(function(l){ return l.start; }).filter(Boolean).sort(), en=L.map(function(l){ return l.end||l.start; }).filter(Boolean).sort();
-  var bt=betrGet(k)[wd]; if(bt){ en.push(bt); en.sort(); } var a=hm(st[0]), b=hm(en[en.length-1]), isToday=((new Date().getDay()+6)%7)===wd;
-  var info=E.map(function(x){ var sc=x.stop?ftSched(x,wd,a,b):null, own=ftPickOne(x,a,b);
-    var hins=(sc&&sc.hins)||(x.hin||[]).filter(function(t){ var m=hm(t); return m!==null&&m+(x.trip!=null?+x.trip:15)<=a; }).map(function(t){ return {t:t,dir:''}; });
-    var backs=(sc&&sc.backs)||(x.rueck||[]).filter(function(t){ var m=hm(t); return m!==null&&m-(x.trip!=null?+x.trip:15)>=b; }).map(function(t){ return {t:t,dir:''}; });
+  var bt=betrGet(k)[wd]; if(bt){ en.push(bt); en.sort(); } var a=hm(st[0]), b=hm(en[en.length-1]), isToday=((new Date().getDay()+6)%7)===wd, date=isToday?ftToday():ftNextDate(wd);
+  var dn=['Mo','Di','Mi','Do','Fr','Sa'][wd]+' '+date.slice(8,10)+'.'+date.slice(5,7)+'.';
+  var info=E.map(function(x){ var sc=x.stop?ftSched(x,wd,a,b):null, own=ftPickOne(x,a,b), tr=x.trip!=null?+x.trip:15;
+    var rmvOk=!!(sc&&sc.hins);
+    var hins=rmvOk?sc.hins:(x.hin||[]).filter(function(t){ var m=hm(t); return m!==null&&m+tr<=a; }).map(function(t){ return {t:t,dir:''}; });
+    var backs=rmvOk?sc.backs:(x.rueck||[]).filter(function(t){ var m=hm(t); return m!==null&&m-tr>=b; }).map(function(t){ return {t:t,dir:''}; });
     var sh=ftSelOf(x,wd,'hin'), sb=ftSelOf(x,wd,'back');
     var hin=sh||(hins.length?hins[hins.length-1]:own.hin?{t:own.hin}:null), back=sb||(backs.length?backs[0]:own.back?{t:own.back}:null);
-    var gone=function(sel,list){ return sel&&sc&&!sc.busy&&!sc.err&&list.length&&!list.some(function(d){ return d.t===sel.t; }); };
-    return {x:x,sc:sc,hins:hins,backs:backs,hin:hin,back:back,sh:sh,sb:sb,gh:gone(sh,hins),gb:gone(sb,backs)}; });
-  var rows=info.map(function(o){ var t=FTT[o.x.type]||FTT.bus;
-    var lab=function(sel,kind,mine,gone){ if(!sel) return (o.sc&&o.sc.busy)?'…':'–'; var h='<b>'+esc(sel.t)+'</b>'+(mine?'':' <small>(auto)</small>');
-      if(gone) h+=' <b style="color:var(--danger,#d33)">⚠ Fahrplan geändert</b>';
-      else if(isToday&&mine){ var m=hm(sel.t), now=new Date().getHours()*60+new Date().getMinutes(); if(m!==null&&m>=now-10&&m<=now+180) h+=ftStHTML(ftLiveSel(o.x,kind,sel)); }
-      return h; };
-    return '<div class="ftrow">'+t[0]+' <span class="ftst">'+esc(o.x.stop||'')+(o.x.line?' · '+esc(o.x.line):'')+'</span> hin '+lab(o.hin,'hin',!!o.sh,o.gh)+' · zurück '+lab(o.back,'back',!!o.sb,o.gb)+'</div>'; }).join('');
-  var h='<button type="button" class="ftday" data-a="ftday" data-wd="'+wd+'" aria-expanded="'+(S.ftDay===wd)+'">'+rows+'</button>';
+    return {x:x,sc:sc,rmvOk:rmvOk,hins:hins,backs:backs,hin:hin,back:back,sh:sh,sb:sb}; });
+  var h='<div class="ftday" style="cursor:default">'+info.map(function(o){ var t=FTT[o.x.type]||FTT.bus, lk=o.x.id+'|'+wd;
+    var lab=function(sel,mine){ return sel?'<b>'+esc(sel.t)+'</b>'+(mine?'':' <small>(auto)</small>'):((o.sc&&o.sc.busy)?'…':'–'); };
+    var row='<div class="ftrow" style="display:flex;gap:6px;align-items:center"><button type="button" data-a="ftday" data-wd="'+wd+'" aria-expanded="'+(S.ftDay===wd)+'" style="flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer">'+t[0]+' <span class="ftst">'+esc(o.x.stop||'')+(o.x.line?' · '+esc(o.x.line):'')+'</span> hin '+lab(o.hin,!!o.sh)+' · zurück '+lab(o.back,!!o.sb)+'</button>'
+      +((o.hin||o.back)?'<button type="button" class="btn sm" style="padding:3px 9px;min-height:0" data-a="ftlv" data-id="'+esc(o.x.id)+'" data-wd="'+wd+'" aria-pressed="'+(S.ftLv===lk)+'">🔴 Live</button>':'')+'</div>';
+    if(S.ftLv===lk){ var one=function(sel,kind,nm){ if(!sel) return ''; return '<div style="margin-top:4px"><b>'+nm+' '+esc(sel.t)+'</b>'+(sel.dir?' <small>→ '+esc(sel.dir)+'</small>':'')+'<br>'+ftStHTML(ftLiveSel(o.x,kind,sel,date),isToday)+'</div>'; };
+      row+='<div class="panel" style="margin:6px 0;padding:8px 10px;font-weight:400"><b>🔴 Live · '+esc(o.x.stop||'')+' · '+esc(dn)+'</b>'+one(o.hin,'hin','Hin')+one(o.back,'back','Zurück')+'<div class="btns" style="margin-top:6px"><button type="button" class="btn sm" data-a="ftlvr" data-id="'+esc(o.x.id)+'" data-wd="'+wd+'">Aktualisieren</button><button type="button" class="btn sm" data-a="ftlv" data-id="'+esc(o.x.id)+'" data-wd="'+wd+'">Schließen</button></div></div>'; }
+    return row; }).join('')+'</div>';
   if(S.ftDay===wd){
-    h+='<div class="ftdx"><p class="hint" style="margin:0 0 6px">Tippe deinen Bus an. Die App merkt ihn sich für diesen Tag, prüft ihn gegen den aktuellen RMV-Fahrplan und zeigt am Schultag live, ob er pünktlich ist. Hin: Busse, die mit '+esc(String(E[0].trip!=null?E[0].trip:15))+' Min. Fahrzeit vor '+esc(st[0]||'')+' ankommen. Zurück: Busse, die nach '+esc(en[en.length-1]||'')+(bt?' (Ende Betreuung)':'')+' an eurer Haltestelle ankommen.</p>'
-     +info.map(function(o){ var x=o.x, t=FTT[x.type]||FTT.bus;
-      var chips=function(list,kind,sel){ if(o.sc&&o.sc.busy&&!list.length) return '<span class="hint">Fahrplan wird geladen …</span>'; if(!list.length) return '<span class="hint">keine Fahrt gefunden</span>';
-        return list.map(function(d){ var on=sel&&sel.t===d.t&&(!sel.dir||!d.dir||sel.dir===d.dir); return '<button type="button" class="chip" style="padding:4px 8px;font-size:12px" data-a="ftsel" data-id="'+esc(x.id)+'" data-wd="'+wd+'" data-k="'+kind+'" data-t="'+esc(d.t)+'" data-dir="'+esc(d.dir||'')+'" aria-pressed="'+!!on+'">'+esc(d.t)+(d.dir?' <small>→ '+esc(d.dir.replace(/^Usingen[- ]/,''))+'</small>':'')+'</button>'; }).join(''); };
-      return '<div style="margin-top:6px"><b>'+t[0]+' '+esc((x.line?x.line+' · ':'')+x.stop)+'</b>'
-        +'<div class="fld" style="margin:4px 0"><span class="lbl">Hin</span><div class="chips">'+chips(o.hins,'hin',o.sh)+'</div></div>'
-        +'<div class="fld" style="margin:4px 0"><span class="lbl">Zurück</span><div class="chips">'+chips(o.backs,'back',o.sb)+'</div></div>'
-        +((o.sh||o.sb)?'<div class="btns"><button type="button" class="btn sm" data-a="ftselall" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Für Mo–Fr übernehmen</button><button type="button" class="btn sm" data-a="ftselx" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Auswahl löschen</button></div>':'')
-        +(o.sc&&o.sc.err?'<p class="hint err">'+esc(ftErrTxt(o.sc.err))+'</p>':'')+'</div>'; }).join('')+'</div>'; }
+    h+='<div class="ftdx"><p class="hint" style="margin:0 0 6px">Tippe deinen Bus an und dann auf „Speichern“. Hin: Busse, die vor '+esc(st[0]||'')+' an der Schule sind. Zurück: Busse, die nach '+esc(en[en.length-1]||'')+(bt?' (Ende Betreuung)':'')+' an eurer Haltestelle ankommen.</p>'
+     +info.map(function(o){ var x=o.x, t=FTT[x.type]||FTT.bus, dh=ftDraftOf(x,wd,'hin'), db=ftDraftOf(x,wd,'back'), curH=dh!==undefined?dh:o.sh, curB=db!==undefined?db:o.sb, dirty=dh!==undefined||db!==undefined;
+      var chips=function(list,kind,sel){ if(!list.length) return '<span class="hint">'+(o.sc&&o.sc.busy?'Fahrplan wird geladen …':'keine Fahrt gefunden')+'</span>';
+        return list.map(function(d){ var on=sel&&sel.t===d.t&&(!sel.dir||!d.dir||sel.dir===d.dir); return '<button type="button" class="chip" style="padding:4px 8px;font-size:12px" data-a="ftsel" data-id="'+esc(x.id)+'" data-wd="'+wd+'" data-k="'+kind+'" data-t="'+esc(d.t)+'" data-dir="'+esc(d.dir||'')+'" aria-pressed="'+!!on+'">'+esc(d.t)+(d.dir?' <small>→ '+esc(d.dir.replace(/^Usingen[- ,]+/,''))+'</small>':'')+'</button>'; }).join(''); };
+      var src=o.rmvOk?'<p class="hint" style="margin:2px 0">Fahrplan von RMV für '+esc(dn)+'</p>':o.sc&&o.sc.busy?'<p class="hint" style="margin:2px 0">RMV-Fahrplan wird geladen …</p>':'<p class="hint err" style="margin:2px 0">RMV-Fahrplan nicht geladen'+(o.sc&&o.sc.err?': '+esc(ftErrTxt(o.sc.err).replace(/\.$/,'')):'')+'. Gezeigt werden deine eigenen Zeiten.</p>';
+      return '<div style="margin-top:8px"><b>'+t[0]+' '+esc((x.line?x.line+' · ':'')+x.stop)+'</b>'+src
+        +'<div class="fld" style="margin:4px 0"><span class="lbl">Hin</span><div class="chips">'+chips(o.hins,'hin',curH)+'</div></div>'
+        +'<div class="fld" style="margin:4px 0"><span class="lbl">Zurück</span><div class="chips">'+chips(o.backs,'back',curB)+'</div></div>'
+        +'<div class="btns">'+(dirty?'<button type="button" class="btn sm pri" data-a="ftsave" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Speichern</button><button type="button" class="btn sm" data-a="ftsave" data-all="1" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Für Mo–Fr speichern</button>':'')+'<button type="button" class="btn sm" data-a="ftreload" data-id="'+esc(x.id)+'" data-wd="'+wd+'">Fahrplan neu laden</button></div></div>'; }).join('')+'</div>'; }
   return h; }
-function ftErrTxt(e){ return e==='helfer'?'Der Cloudflare-Helfer ist auf diesem Gerät noch nicht eingetragen.':e==='nokey'?'Im Cloudflare-Helfer fehlt der RMV-Schlüssel.':e==='alt'?'Der Cloudflare-Helfer ist noch die alte Version. Bitte den neuen Helfer-Code einspielen.':e==='nf'?'Haltestelle bei RMV nicht gefunden. Schreib sie genauer, mit Ort davor.':'RMV-Fahrplan gerade nicht abrufbar ('+e+'). Die App versucht es in 2 Minuten erneut.'; }
+function ftErrTxt(e){ return e==='helfer'?'Der Cloudflare-Helfer ist auf diesem Gerät noch nicht eingetragen.':e==='nokey'?'Im Cloudflare-Helfer fehlt der RMV-Schlüssel.':e==='alt'?'Der Cloudflare-Helfer ist noch die alte Version. Bitte den neuen Helfer-Code einspielen.':e==='nf'?'Haltestelle bei RMV nicht gefunden. Schreib sie genauer, mit Ort davor.':e==='linie'?'Die Linie im Fahrplan-Eintrag ist ungültig (nur Buchstaben und Zahlen).':/^API_/.test(e)?'RMV lehnt die Abfrage ab ('+e+').':/fetch/i.test(e)?'Keine Verbindung zum Cloudflare-Helfer.':'RMV-Fahrplan gerade nicht abrufbar ('+e+').'; }
 function ftSetPick(id,fn){ ftSaveList(ftList().map(function(y){ if(y.id!==id) return y; var p=JSON.parse(JSON.stringify(y.pick||{})); fn(p); return Object.assign({},y,{pick:p}); })); ftRedraw(); }
+function ftDropCache(pre){ var all=ftAutoAll(); Object.keys(all).forEach(function(k){ if(k.indexOf(pre)===0) delete all[k]; }); ftAutoSave(); }
 function ftScanHTML(){ var sc=S.ftScan, h='<div class="fld"><label class="btn sm filebtn">'+(sc&&sc.busy?'Wird ausgelesen …':'🔍 Fahrplan per Foto oder PDF auslesen')+'<input type="file" class="ftscan" accept="image/*,application/pdf,.pdf"'+(sc&&sc.busy?' disabled':'')+'></label>';
   if(sc&&sc.msg) h+='<p class="hint'+(sc.err?' err':'')+'">'+esc(sc.msg)+'</p>';
   if(sc&&sc.dirs&&sc.dirs.length) h+=sc.dirs.map(function(d,i){ return '<div class="ftc" style="margin:8px 0 0"><b>'+esc((d.line?'Linie '+d.line+' · ':'')+'Richtung '+(d.to||'?'))+'</b>'+(d.days?'<small>'+esc(d.days)+'</small>':'')+'<div class="ftt">'+d.times.map(function(z){ return '<span>'+esc(z)+'</span>'; }).join('')+'</div><div class="btns"><button type="button" class="btn sm'+(d.used==='hin'?' pri':'')+'" data-a="ftuse" data-i="'+i+'" data-v="hin">Als Hinfahrt</button><button type="button" class="btn sm'+(d.used==='rueck'?' pri':'')+'" data-a="ftuse" data-i="'+i+'" data-v="rueck">Als Rückfahrt</button></div></div>'; }).join('')+'<div class="btns"><button type="button" class="btn sm" data-a="ftscanx">Ergebnis ausblenden</button></div>';
@@ -2298,9 +2305,12 @@ function ftClick(a,t){
   if(a==='ftuse'){ ftGrab(); var sc=S.ftScan, dr=sc&&sc.dirs[+t.dataset.i]; if(!dr) return true; var key=t.dataset.v; S.ft[key]=ftTimes(dr.times.join(',')).join(', '); if(!S.ft.days&&dr.days) S.ft.days=dr.days.slice(0,30); dr.used=key; renderSheet(); return true; }
   if(a==='ftscanx'){ S.ftScan=null; renderSheet(); return true; }
   if(a==='ftday'){ var wd=+t.dataset.wd; S.ftDay=S.ftDay===wd?null:wd; renderSchool(); return true; }
-  if(a==='ftsel'){ var d0=t.dataset, w0=+d0.wd; ftSetPick(d0.id,function(p){ var o=p[w0]=p[w0]||{}; if(o[d0.k]&&o[d0.k].t===d0.t&&(o[d0.k].dir||'')===(d0.dir||'')) delete o[d0.k]; else o[d0.k]={t:d0.t,dir:d0.dir||''}; }); return true; }
-  if(a==='ftselall'){ var w1=+t.dataset.wd; ftSetPick(t.dataset.id,function(p){ var src=JSON.parse(JSON.stringify(p[w1]||{})); [0,1,2,3,4].forEach(function(w){ p[w]=JSON.parse(JSON.stringify(src)); }); }); toast('Für Montag bis Freitag übernommen.'); return true; }
-  if(a==='ftselx'){ var w2=+t.dataset.wd; ftSetPick(t.dataset.id,function(p){ delete p[w2]; }); return true; }
+  if(a==='ftsel'){ var d0=t.dataset, w0=+d0.wd, dk=d0.id+'|'+w0; S.ftDraft=S.ftDraft||{}; var dr=S.ftDraft[dk]=S.ftDraft[dk]||{}; var x0=ftList().filter(function(y){ return y.id===d0.id; })[0]||{}; var cur=dr[d0.k]!==undefined?dr[d0.k]:ftSelOf(x0,w0,d0.k===('back')?'back':'hin');
+    dr[d0.k]=(cur&&cur.t===d0.t&&(cur.dir||'')===(d0.dir||''))?null:{t:d0.t,dir:d0.dir||''}; renderSchool(); return true; }
+  if(a==='ftsave'){ var d1=t.dataset, w1=+d1.wd, dk1=d1.id+'|'+w1, dr1=(S.ftDraft||{})[dk1]||{}; ftSetPick(d1.id,function(p){ (d1.all?[0,1,2,3,4]:[w1]).forEach(function(w){ var o=p[w]=p[w]||{}; ['hin','back'].forEach(function(kk){ if(dr1[kk]===undefined){ if(d1.all&&w!==w1){ var src=(p[w1]||{})[kk]; if(src) o[kk]=src; } return; } if(dr1[kk]) o[kk]=dr1[kk]; else delete o[kk]; }); }); }); if(S.ftDraft) delete S.ftDraft[dk1]; toast(d1.all?'Für Montag bis Freitag gespeichert.':'Gespeichert.'); return true; }
+  if(a==='ftlv'){ var lk=t.dataset.id+'|'+t.dataset.wd; S.ftLv=S.ftLv===lk?null:lk; if(S.ftLv) ftDropCache('l|'+t.dataset.id+'|'); renderSchool(); return true; }
+  if(a==='ftlvr'){ ftDropCache('l|'+t.dataset.id+'|'); renderSchool(); return true; }
+  if(a==='ftreload'){ ftDropCache('s|'+t.dataset.id+'|'); var xs=ftList().map(function(y){ return y.id===t.dataset.id?Object.assign({},y,{ext:'',extFor:''}):y; }); ftSaveList(xs); renderSchool(); return true; }
   if(a==='ftviewx'){ S.ftView=''; renderSheet(); return true; }
   if(a==='ftphdel'){ ftGrab(); var pid=t.dataset.id; if(S.ftPhDel!==pid){ S.ftPhDel=pid; renderSheet(); return true; } S.ftPhDel=''; safe(function(){ return S.store.remove('citems',pid); }).then(function(){ setTimeout(renderSheet,200); }); return true; }
   return false; }
@@ -2342,7 +2352,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 18:00';
+var APPVER='7.11.2026 · 18:15';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
