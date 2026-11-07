@@ -2275,7 +2275,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 17:14';
+var APPVER='7.11.2026 · 17:20';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -3115,7 +3115,7 @@ function bgImage(st,c,i){
   if(st.kind==='logo') return logoBg(c);
   if(st.kind==='metal') return metal(c);
   if(st.kind==='neon') return 'radial-gradient(circle at 18% 12%,'+c[1]+' 0%,transparent 42%),radial-gradient(circle at 85% 78%,'+c[2]+' 0%,transparent 46%),radial-gradient(circle at 60% 40%,color-mix(in srgb,'+c[1]+' 35%,transparent) 0%,transparent 30%),linear-gradient('+c[0]+','+c[0]+')';
-  if(st.kind==='marmor') return 'linear-gradient(115deg,transparent 40%,'+c[1]+' 46%,transparent 51%,'+c[1]+' 68%,transparent 71%),linear-gradient(160deg,'+c[0]+' 0%,'+c[2]+' 100%)';
+  if(st.kind==='marmor'){ var v1='color-mix(in srgb,'+c[1]+' 90%,transparent)', v2='color-mix(in srgb,'+c[1]+' 55%,transparent)', v3='color-mix(in srgb,'+c[2]+' 60%,transparent)'; return 'linear-gradient(38deg,transparent 0 47%,'+v1+' 48%,transparent 49.5% 61%,'+v2+' 62%,transparent 63%),linear-gradient(-62deg,transparent 0 22%,'+v2+' 23%,transparent 24.5% 52%,'+v1+' 53%,transparent 54%),linear-gradient(104deg,transparent 0 70%,'+v3+' 71%,transparent 72.5% 88%,'+v2+' 89%,transparent 90%),radial-gradient(ellipse 60% 22% at 25% 35%,'+v3+' 0%,transparent 70%),radial-gradient(ellipse 45% 18% at 75% 70%,'+v2+' 0%,transparent 70%),linear-gradient(160deg,'+c[0]+' 0%,'+c[2]+' 100%)'; }
   if(st.kind==='edel') return 'linear-gradient(135deg,'+c[0]+' 0%,'+c[2]+' 36%,color-mix(in srgb,'+c[1]+' 70%,'+c[0]+') 50%,'+c[2]+' 64%,'+c[0]+' 100%)';
   if(st.kind==='matt'){ var g='linear-gradient(170deg,'+c[1]+' 0%,'+c[0]+' 55%,'+c[2]+' 100%)'; if(st.wood&&st.wood.indexOf(i)>-1) g='repeating-linear-gradient(92deg,transparent 0 22px,color-mix(in srgb,'+c[2]+' 45%,transparent) 22px 24px,transparent 24px 41px,color-mix(in srgb,'+c[2]+' 30%,transparent) 41px 42px),'+g; return g; }
   return 'linear-gradient(160deg,'+c[0]+' 0%,'+c[1]+' 52%,'+c[2]+' 100%)';
