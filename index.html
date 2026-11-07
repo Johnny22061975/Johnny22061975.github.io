@@ -709,7 +709,7 @@ function pname(k){ return (S.people[k]&&S.people[k].name)||k; }
 function activePeople(){ var a=PEOPLE.filter(function(k){ return S.people[k].active; }); if(!a.length) return [PEOPLE[0]]; if(S.me&&a.indexOf(S.me)>0){ a=[S.me].concat(a.filter(function(k){ return k!==S.me; })); } return a; }
 function findRow(rows,id){ var r=null; rows.forEach(function(x){ if(x.id===id) r=x; }); return r; }
 function applySettings(rows){
-  S.settingsRows={}; rows.forEach(function(r){ S.settingsRows[r.id]=r; });
+  S.settingsRows={}; rows.forEach(function(r){ S.settingsRows[r.id]=r; }); meAuto();
   setTimeout(function(){ if(S.me&&!(S.settingsRows||{})['look_'+S.me]&&S.fbUser) lookBackup(); else lookRestore(); },0);
   var scl=findRow(rows,'schoolcal'); S.schoolCal=(scl&&scl.m&&typeof scl.m==='object')?scl.m:{};
   var rof=findRow(rows,'roworder'); S.rowOrd=(rof&&rof.p&&typeof rof.p==='object')?rof.p:{};
@@ -1690,6 +1690,7 @@ function shiftOn(k,s){
 function shiftTimes(k,s){ var o=S.shifts[k+'_'+s], pr=planRowAt(k,s), a='', b='';
   if(pr&&pr.c!=='-'&&(!o||o.code===pr.c||(o.code==='TD'&&pr.c==='WE'))){ a=pr.a||''; b=pr.b||''; }
   if(o&&(o.a||o.b)){ a=o.a||a; b=o.b||b; }
+  if(!a&&!b){ var cd=(o&&o.code)||(pr&&pr.c), sd=cd?shdGet(k)[cd==='WE'?'TD':cd]:null; if(sd){ a=sd.a||''; b=sd.b||''; } }
   return {a:a,b:b}; }
 function shBadge(k,s){
   var c=shiftOn(k,s);
@@ -2092,7 +2093,7 @@ function eventSheetHTML(){
     +buttons;
 }
 function menuStyleVars(){ var cur=bgEdGet('bgs')||'metal', ui=BGST[S.bgUi||cur]||BGST.metal, on=bgEdGet('bgm')==='col'&&cur===ui.k, v=bgEdGet('bgv'), dk=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); return {cur:cur,ui:ui,on:on,v:v,dk:dk}; }
-var MENUP=[['familie','👨‍👩‍👧‍👦','Familie & Kalenderreihenfolge'],['wecker','⏰','Erinnerungen & Wecker'],['darst','🌗','Darstellung & Hintergrund'],['reiter','🗂️','Reiter-Leiste'],['fahrt','🚌','Fahrpläne'],['stunden','⏱️','Stundenzähler'],['fristen','⏳','Fristen & Verträge']];
+var MENUP=[['familie','👨‍👩‍👧‍👦','Familie, Kalenderreihenfolge & Sprache'],['wecker','⏰','Erinnerungen & Wecker'],['darst','🌗','Darstellung & Hintergrund'],['reiter','🗂️','Reiter-Leiste'],['fahrt','🚌','Fahrpläne'],['stunden','⏱️','Stundenzähler'],['fristen','⏳','Fristen & Verträge']];
 function menuSummary(k){ var m=menuStyleVars();
   if(k==='wecker'){ var n=0; Object.keys(S.alarms||{}).forEach(function(p){ Object.keys(S.alarms[p]||{}).forEach(function(c){ if(S.alarms[p][c]&&S.alarms[p][c].on) n++; }); }); return n?n+' Schicht-Wecker':''; }
   if(k==='darst') return (({light:'Hell',dark:'Dunkel',auto:'Wie das Handy'})[S.theme]||'')+' · '+(shLay()==='row'?'nebeneinander':'untereinander')+' · '+(menuStyleVars().cur?(BGST[menuStyleVars().cur]||BGST.metal).l:'');
@@ -2108,14 +2109,38 @@ function menuSummary(k){ var m=menuStyleVars();
   if(k==='fristen'){ var fn=fristNotice().length; return fn?fn+' bald fällig':setList('fristen').length?setList('fristen').length+' eingetragen':'TÜV, Ausweise, Verträge'; }
   if(k==='stunden'){ var hn=Object.keys(hrCfg()).filter(function(p){ return hrCfg()[p].on; }).length; return hn?'an für '+hn:'aus (freiwillig)'; }
   return ''; }
-function remPrefHTML(){ var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">🙋 So werde ich erinnert</b>';
+function profGet(k){ var r=k?(S.settingsRows||{})['prof_'+k]:null; return (r&&typeof r==='object')?r:{}; }
+function meBlockHTML(){ var me=S.me&&S.people[S.me]?S.me:null;
+  if(!me||S.meSwitch) return '<div class="fld"><span class="lbl">🙋 Wer bist du?</span><div class="chips">'+PEOPLE.filter(function(k){ return S.people[k].active; }).map(function(k){ return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="setme" data-k="'+k+'" aria-pressed="'+(S.me===k)+'"><i class="pd"></i>'+esc(pname(k))+'</button>'; }).join('')+'</div><p class="hint">Einmal auswählen. Danach erkennt die App dich an deinem Google-Konto auf jedem Gerät.</p>'+(me?'<button type="button" class="linkb" data-a="meswitch" data-v="">Abbrechen</button>':'')+'</div>';
+  var p=profGet(me), nick=p.nick?' („'+esc(p.nick)+'“)':'';
+  var h='<div class="fld"><span class="lbl">🙋 Ich bin</span><button type="button" class="mrow" data-a="profopen" data-v="'+(S.profOpen?'':'1')+'" aria-expanded="'+!!S.profOpen+'"><span class="mi" style="color:var(--p-'+me+')">●</span><span class="mt">'+esc(pname(me))+nick+'</span><span class="ms">'+(S.profOpen?'zuklappen':'Profil')+'</span></button>';
+  if(S.profOpen){ var bd=/^\d{4}-\d{2}-\d{2}$/.test(p.bday||'')?p.bday.split('-'):['','',''], opt=function(a,b,cur,lab,id,f){ var o='<option value="">'+lab+'</option>'; for(var i=a;b>a?i<=b:i>=b;b>a?i++:i--) o+='<option value="'+i+'"'+(+cur===i?' selected':'')+'>'+(f?f(i):i)+'</option>'; return '<select id="'+id+'">'+o+'</select>'; };
+    var inp=function(id,lab,v,type,ph){ return '<div class="fld" style="margin:6px 0"><label class="lbl" for="'+id+'">'+lab+'</label><input type="'+(type||'text')+'" id="'+id+'" value="'+esc(v||'')+'" placeholder="'+esc(ph||'')+'" maxlength="120"></div>'; };
+    h+='<div class="panel" style="margin:6px 0 0">'+inp('pf-name','Vollständiger Name',p.name,'text',pname(me))+inp('pf-nick','Spitzname',p.nick,'text','optional')+inp('pf-addr','Adresse',p.addr,'text','Straße, PLZ Ort')+inp('pf-tel','Handynummer',p.tel,'tel','')+inp('pf-mail','E-Mail',p.mail||(S.fbUser&&S.fbUser.email)||'','email','')
+      +'<div class="fld" style="margin:6px 0"><span class="lbl">Geburtsdatum</span><div style="display:grid;grid-template-columns:1fr 1.6fr 1.2fr;gap:6px">'+opt(1,31,bd[2],'Tag','pf-bd-d')+opt(1,12,bd[1],'Monat','pf-bd-m',function(i){ return MON[i-1]; })+opt(new Date().getFullYear(),1920,bd[0],'Jahr','pf-bd-y')+'</div><p class="hint">Der Geburtstag kommt automatisch in den Kalender und ins Adressbuch.</p></div>'
+      +(S.profMsg?'<p class="hint err">'+esc(S.profMsg)+'</p>':'')
+      +'<div class="btns"><button type="button" class="btn pri" data-a="profsave">Speichern</button><button type="button" class="btn" data-a="profopen" data-v="">Abbrechen</button></div></div>'; }
+  return h+'<button type="button" class="linkb" data-a="meswitch" data-v="1">Person wechseln</button></div>'; }
+function profSave(){ var me=S.me; if(!me) return; var g=function(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; };
+  var mail=g('pf-mail'); if(mail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ S.profMsg='Die E-Mail-Adresse sieht nicht richtig aus.'; renderSheet(); return; }
+  var d=g('pf-bd-d'), m=g('pf-bd-m'), y=g('pf-bd-y'), bday=(d&&m)?((y||'0000')+'-'+pad(+m)+'-'+pad(+d)):'';
+  var o={name:g('pf-name').slice(0,80),nick:g('pf-nick').slice(0,30),addr:g('pf-addr').slice(0,200),tel:g('pf-tel').slice(0,40),mail:mail.slice(0,120),bday:bday,ts:Date.now()};
+  S.settingsRows=S.settingsRows||{}; S.settingsRows['prof_'+me]=o; saveSettings('prof_'+me,o);
+  if(S.store){ var cid='me_'+me, old=(S.contacts||[]).filter(function(c){ return c.id===cid; })[0]||{};
+    var ct={name:o.name||pname(me),phone:o.tel,phones:o.tel?[{t:'mobil',n:o.tel}]:[],mails:o.mail?[{t:'priv',a:o.mail}]:[],addr:o.addr,bday:bday,owner:me,showCal:!!bday,remind:old.remind!==undefined?old.remind:(bday?'day':''),remAt:old.remAt||'09:00',alarm:!!old.alarm,imp:!!old.imp,by:me,ts:Date.now()};
+    safe(function(){ return S.store.set('contacts',cid,ct); }); }
+  S.profMsg=''; S.profOpen=false; toast('Profil gespeichert.'); renderSheet(); }
+function meAuto(){ if(S.me&&S.people[S.me]) return; var u=S.fbUser&&S.fbUser.uid, r=u&&S.settingsRows?S.settingsRows['acct_'+u]:null;
+  if(r&&r.k&&S.people[r.k]){ S.me=r.k; lsSet('me',S.me); setTimeout(function(){ try{ renderNotice(); renderCal(); renderShop(); renderNotes(); if(S.sheet==='settings') renderSheet(); }catch(e){} },0); } }
+function remPrefHTML(){ if(!S.remOpen) return '<button type="button" class="mrow" data-a="remopen" data-v="1" style="margin:0 0 12px"><span class="mi">🔔</span><span class="mt">So werde ich erinnert</span><span class="ms">'+(S.me&&!isGenName(S.me)?'antippen zum Einstellen':'')+'</span></button>';
+  var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">🔔 So werde ich erinnert</b>';
   if(!S.me||isGenName(S.me)) return h+'<p class="hint">Bitte zuerst unter Menü → „Familie“ → „Wer bist du?“ auswählen, wer dieses Handy benutzt. Jede Person stellt das hier für sich selbst ein.</p></div>';
   var p=remPref(S.me), sel=function(key,v){ return '<select data-rem="'+key+'" style="width:auto">'+REMMODE.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; };
   return h+'<p class="hint">Gilt nur für <span style="font-weight:700;color:var(--p-'+S.me+')">'+esc(pname(S.me))+'</span>. Die anderen stellen das auf ihrem Handy selbst ein.</p>'
    +'<div class="tabrow" style="gap:8px"><span style="min-width:0">Meine Termine</span>'+sel('own',p.own)+'</div>'
    +'<div class="tabrow" style="gap:8px"><span style="min-width:0">Termine für „Allgemein“</span>'+sel('all',p.all)+'</div>'
    +'<label class="cb" style="display:flex;gap:10px;align-items:center;margin-top:6px"><input type="checkbox" data-rem="oth"'+(p.oth?' checked':'')+' style="width:22px;height:22px">Auch bei Terminen der anderen benachrichtigen</label>'
-   +'<p class="hint">Erinnert wird nur bei Terminen, bei denen eine Erinnerung eingestellt ist. Der Haken „Bei mir als Wecker klingeln“ am Termin gilt immer nur für die Person, die ihn setzt.</p></div>'; }
+   +'<p class="hint">Erinnert wird nur bei Terminen, bei denen eine Erinnerung eingestellt ist. Der Haken „Bei mir als Wecker klingeln“ am Termin gilt immer nur für die Person, die ihn setzt.</p><div class="btns"><button type="button" class="btn sm pri" data-a="remopen" data-v="">Fertig</button></div></div>'; }
 function weckerOneHTML(k){ var A=S.alarms||{}, codes=[['F','Frühschicht'],['S','Spätschicht'],['N','Nachtschicht'],['TD','Tagdienst']];
   var h='<div class="panel" style="margin:14px 0 0"><b class="bpt">⏰ Schicht-Wecker für <span style="color:var(--p-'+k+')">'+esc(pname(k))+'</span></b>';
   if(!hasShAlarm(k)) return h+'<p class="hint">Der Schicht-Wecker ist für '+esc(pname(k))+' aus. Einschalten: Menü → „Familie & Kalenderreihenfolge“ → ⚙ bei '+esc(pname(k))+'.</p></div>';
@@ -2370,7 +2395,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 19:35';
+var APPVER='7.11.2026 · 21:55';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2543,10 +2568,10 @@ function settingsSheetHTML(){
   }).join('')+((PEOPLE.length<20||PEOPLE.some(function(k){ return S.people[k]&&!S.people[k].active; }))?'<button type="button" class="btn" data-a="padd">+ Person hinzufügen</button>':'');
     body='<div class="fld"><span class="lbl">Personen & Reihenfolge im Kalender</span>'+rows+'<p class="hint">Farbpunkt antippen: Farbe ändern.<br>▲ ▼: Reihenfolge der Zeilen im Kalender, auch für die Müllabfuhr.<br>⚙: öffnet ⏰ Schicht-Wecker (nur diese Personen erscheinen unter „Erinnerungen &amp; Wecker“) und 📵 Hat noch kein Handy (zählt im Chat bei den Punkten nicht mit).<br>🗑: Person löschen. Zweimal tippen. Dabei gehen auch ihr Schichtplan und ihre Einstellungen verloren.<br>„+ Person hinzufügen“: neue Person anlegen, bis zu 20, zum Beispiel die Oma.</p></div>'+'<div class="fld"><span class="lbl">Personen im Kästchen (Monat und Woche)</span><div class="chips">'+[['col','Untereinander'],['row','Nebeneinander']].map(function(o){ return '<button type="button" class="chip" data-a="shlay" data-v="'+o[0]+'" aria-pressed="'+(shLay()===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Untereinander: jede Person bekommt in jedem Kästchen ihre eigene Zeile mit Schicht und Terminen, dazu eine Zeile für die Müllabfuhr.</p>'+'</div>'+'<p class="hint">'+(S.mode==='db'?'Alles wird live gespeichert und mit allen freigeschalteten Familienmitgliedern geteilt, auch ohne Internet: Änderungen werden nachgeschickt, sobald wieder Empfang da ist.':'Die Einträge liegen nur auf diesem Gerät.')+'</p>'; }
   var lockable=['darst','stil','farben','reiter','wecker','familie'].indexOf(pg)>-1, locked=lockable&&!S.lookEdit;
-  if(pg==='familie') body='<div class="fld"><span class="lbl">Sprache</span><div class="chips" data-noi18n>'+(window.FP_LANGS||[]).map(function(o){ return '<button type="button" class="chip" data-a="lang" data-v="'+o[0]+'" aria-pressed="'+(window.FP_LANG===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät. Eigene Einträge wie Termine und Nachrichten werden nicht übersetzt.</p></div>'+body;
-  var meBlock=pg==='familie'?'<div class="fld"><span class="lbl">🙋 Wer bist du?</span><div class="chips">'+PEOPLE.filter(function(k){ return S.people[k].active; }).map(function(k){ return '<button type="button" class="chip" style="--pc:var(--p-'+k+')" data-a="setme" data-k="'+k+'" aria-pressed="'+(S.me===k)+'"><i class="pd"></i>'+esc(pname(k))+'</button>'; }).join('')+'</div><p class="hint">Wähle aus, wer dieses Handy benutzt. Das merkt sich nur dieses Gerät.</p></div>':'';
+  var langBlock=pg!=='familie'?'':'<div class="fld"><span class="lbl">Sprache</span><div class="chips" data-noi18n>'+(window.FP_LANGS||[]).map(function(o){ return '<button type="button" class="chip" data-a="lang" data-v="'+o[0]+'" aria-pressed="'+(window.FP_LANG===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät. Eigene Einträge wie Termine und Nachrichten werden nicht übersetzt.</p></div>';
+  var meBlock=pg==='familie'?meBlockHTML():'';
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
-  if(meBlock) body=meBlock+remPrefHTML()+body;
+  if(meBlock) body=langBlock+meBlock+remPrefHTML()+body;
   return shHead(title)+body;
 }
 function shTop(){ var e=document.querySelector('.sheet'); if(e) e.scrollTop=0; }
@@ -2908,8 +2933,12 @@ document.addEventListener('click',function(e){
     case 'pdel': var dk=t.dataset.k;
       if(S.pdel!==dk){ S.pdel=dk; renderSheet(); break; }
       if(PEOPLE.length>1){ PEOPLE.splice(PEOPLE.indexOf(dk),1); delete S.people[dk]; delete S.plans[dk]; if(S.me===dk){ S.me=null; lsSet('me',''); } S.pdel=''; S.pedit=''; savePeople(); if(S.store&&plansRaw) saveSettings('plans',plansRaw()); renderNotice(); renderCal(); renderShopForm(); renderNotes(); renderSheet(); } break;
+    case 'profopen': S.profOpen=!!t.dataset.v; S.profMsg=''; renderSheet(); break;
+    case 'profsave': profSave(); break;
+    case 'meswitch': S.meSwitch=!!t.dataset.v; renderSheet(); break;
+    case 'remopen': S.remOpen=!!t.dataset.v; renderSheet(); break;
     case 'setme':
-      S.me=t.dataset.k; lsSet('me',S.me); try{ localStorage.removeItem('fp2_lookts'); }catch(x){} setTimeout(lookRestore,0); renderNotice(); renderCal(); renderShop(); renderNotes();
+      S.me=t.dataset.k; lsSet('me',S.me); S.meSwitch=false; S.profOpen=false; if(S.fbUser&&S.fbUser.uid&&!isGenName(S.me)){ S.settingsRows=S.settingsRows||{}; S.settingsRows['acct_'+S.fbUser.uid]={k:S.me}; saveSettings('acct_'+S.fbUser.uid,{k:S.me}); } try{ localStorage.removeItem('fp2_lookts'); }catch(x){} setTimeout(lookRestore,0); renderNotice(); renderCal(); renderShop(); renderNotes();
       if(S.sheet==='settings') renderSheet(); break;
     case 'shopwho': S.shopWho=t.dataset.k; renderShopForm(); break;
     case 'shopfilter': S.shopFilter=t.dataset.k; renderShop(); break;
@@ -3303,7 +3332,7 @@ function boot(){
   if(window.FP_CONFIG){
     var lg=$('#login'), lm=$('#loginMsg'), lb=$('#loginBtn'), lo=$('#logoutBtn'); lg.hidden=false;
     var onAuth=function(d){ if(!d) return;
-      if(d.state==='in'){ S.fbUser=d.user; S.sample=d.sample; if(!S.store) connect(wrapStore(d.store)); lg.hidden=true; renderAll(); }
+      if(d.state==='in'){ S.fbUser=d.user; meAuto(); S.sample=d.sample; if(!S.store) connect(wrapStore(d.store)); lg.hidden=true; renderAll(); }
       else if(d.state==='out'){ lg.hidden=false; lm.textContent='Melde dich mit deinem Google-Konto an. Nur eure Familie hat Zugang.'; lb.hidden=false; lo.hidden=true; }
       else if(d.state==='error'){ lg.hidden=false; lm.textContent=d.msg||'Fehler.'; lb.hidden=false; } };
     window.addEventListener('fp-auth',function(e){ onAuth(e.detail); }); onAuth(window.FP_LAST);
