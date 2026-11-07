@@ -113,7 +113,7 @@ body.glas .card,body.glas .panel{background:color-mix(in srgb,var(--surface) 80%
 .prows{display:grid;grid-auto-rows:18px;row-gap:2px;width:100%;margin-top:2px}.pr{display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap}.pr .sh{flex:none;min-width:17px;height:17px;padding:0 2px;font-size:10px}.pr .me{flex:none}.pr .me b{display:inline;max-width:70px;overflow:hidden;text-overflow:ellipsis}.prb{gap:2px}.pb{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bc);flex:none}.day .prows{justify-items:center}.day .pr{justify-content:center}
 .sh.swp{background-image:repeating-linear-gradient(135deg,var(--pc) 0 3px,color-mix(in srgb,var(--pc) 45%,#fff) 3px 6px)!important;color:#1b1f26!important;text-shadow:0 0 2px #fff}
 .ftc{display:grid;gap:6px;padding:12px;border:1.5px solid var(--line2);border-radius:14px;margin-bottom:10px}.ftc h3{margin:0;font-size:16px;display:flex;gap:8px;align-items:center}.ftt{display:flex;flex-wrap:wrap;gap:6px;font-size:14px}.ftt b{font-weight:700;color:var(--ink-2);font-size:12px;width:100%}.ftt span{padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--ink) 8%,transparent);font-variant-numeric:tabular-nums}.ftph{display:flex;gap:8px;flex-wrap:wrap}.ftph button{padding:0;border:0;background:none;cursor:pointer;position:relative}.ftph img{width:92px;height:70px;object-fit:cover;border-radius:8px;display:block}.ftbig{width:100%;border-radius:10px;display:block}
-.ftday{display:block;width:100%;text-align:left;font:600 12px var(--f-body);color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,transparent);border:0;border-radius:8px;padding:5px 7px;margin:2px 0 4px;cursor:pointer}.ftday small{font-weight:400;color:var(--ink-2)}.ftrow{display:block;line-height:1.45}.ftst{font-weight:400;color:var(--ink-2)}.ftdx{display:grid;gap:8px;font-size:12px;margin-bottom:6px}.ftdx .ftt{font-size:12px}.ftdx .ftt span.on{background:var(--ink);color:var(--bg);font-weight:700}
+.ftday{display:block;width:100%;text-align:left;font:600 12px var(--f-body);color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,transparent);border:0;border-radius:8px;padding:5px 7px;margin:2px 0 4px;cursor:pointer}.ftday small{font-weight:400;color:var(--ink-2)}.shcr{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}.shcr input[type=color]{width:34px;height:30px;padding:0;border:0;flex:0 0 auto}.shcl{flex:0 0 74px;font-size:14px;font-weight:600}.shct{flex:1;min-width:0;font-size:14px;color:var(--ink-2);text-align:right}.shcr .btn.sm{flex:0 0 auto}.ftrow{display:block;line-height:1.45}.ftst{font-weight:400;color:var(--ink-2)}.ftdx{display:grid;gap:8px;font-size:12px;margin-bottom:6px}.ftdx .ftt{font-size:12px}.ftdx .ftt span.on{background:var(--ink);color:var(--bg);font-weight:700}
 .vermod{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px}.verin{background:var(--surface,var(--bg));color:var(--ink);border-radius:20px;padding:24px 20px;width:min(360px,100%);display:grid;gap:12px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.35)}.verin b{font-size:20px}.verin small{color:var(--ink-2)}.verin .btn.pri{font-size:17px;padding:14px}
 .asgbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;padding:16px}.asgin{background:var(--surface,var(--bg));color:var(--ink);border-radius:18px;padding:16px;width:min(480px,100%);box-shadow:0 8px 30px rgba(0,0,0,.3)}.asgin b{display:block;margin-bottom:10px}
 .asw{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;color:#fff;background:var(--pc);vertical-align:middle}
@@ -1624,6 +1624,7 @@ function timeSelects(key,val,cmp){
 }
 function applyTime(key,v){
   var q=key.split(':'), pf=S.planForm;
+  if(q[0]==='sd'){ var sk=shcK(); if(!sk) return; var so=JSON.parse(JSON.stringify(shdGet(sk))); so[q[1]]=so[q[1]]||{}; so[q[1]][q[2]]=v; S.settingsRows=S.settingsRows||{}; S.settingsRows['shtime_'+sk]=so; saveSettings('shtime_'+sk,so); return; }
   if(q[0]==='al'){ var A=JSON.parse(JSON.stringify(S.alarms||{})); A[q[1]]=A[q[1]]||{}; A[q[1]][q[2]]=A[q[1]][q[2]]||{on:true}; A[q[1]][q[2]].t=v; S.alarms=A; saveSettings('alarms',{p:A}); return; }
   if(key==='lsa'||key==='lsb'){ if(S.lform) S.lform[key==='lsa'?'start':'end']=v; return; }
   if(key==='ctrem'){ if(S.cform) S.cform.remAt=v; return; }
@@ -2017,7 +2018,7 @@ function planSheetHTML(){
     +((has&&!pf.edit)?planSummaryHTML(pf):'<div class="fld"><span class="lbl">Ablauf</span><div id="planRows">'+planRowsHTML(pf)+'</div></div>')
     +'<div id="planPrev">'+planPreviewHTML()+'</div>'
     +(pf.msg?'<p class="hint'+(/^Erkannt/.test(pf.msg)?' ok':' err')+'" role="alert">'+esc(pf.msg)+'</p>':'')
-    +shdHTML(pf.k)+shcHTML()+'<div class="btns">'+((has&&!pf.edit)?'<button type="button" class="btn pri grow" data-a="close">Fertig</button><button type="button" class="btn" data-a="planedit">Ablauf bearbeiten</button>':'<button type="button" class="btn pri grow" data-a="plansave">Speichern, Ablauf wiederholt sich ab hier</button>')+(has?'<button type="button" class="btn danger" data-a="plandel">Plan löschen</button>':'')+'<button type="button" class="btn" data-a="close">Abbrechen</button></div>'+weckerOneHTML(pf.k);
+    +shcHTML()+'<div class="btns">'+((has&&!pf.edit)?'<button type="button" class="btn pri grow" data-a="close">Fertig</button><button type="button" class="btn" data-a="planedit">Ablauf bearbeiten</button>':'<button type="button" class="btn pri grow" data-a="plansave">Speichern, Ablauf wiederholt sich ab hier</button>')+(has?'<button type="button" class="btn danger" data-a="plandel">Plan löschen</button>':'')+'<button type="button" class="btn" data-a="close">Abbrechen</button></div>'+weckerOneHTML(pf.k);
 }
 function plansRaw(){ var raw={}; PEOPLE.forEach(function(k){ if(S.plans[k]) raw[k]={start:S.plans[k].start,seq:S.plans[k].seq,rows:S.plans[k].rows||[],cycN:S.plans[k].cycN||'',cycU:S.plans[k].cycU||'w'}; }); return raw; }
 function savePlan(){
@@ -2369,20 +2370,25 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='7.11.2026 · 19:20';
+var APPVER='7.11.2026 · 19:35';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
 function shcGet(k){ k=k||S.me; var r=k?(S.settingsRows||{})['shcol_'+k]:null; return (r&&typeof r==='object')?r:{on:false}; }
-function shcSave(o){ if(S.me){ S.settingsRows=S.settingsRows||{}; S.settingsRows['shcol_'+S.me]=o; saveSettings('shcol_'+S.me,o); } shcApply(); }
+function shcSave(o,k){ k=k||S.me; if(k){ S.settingsRows=S.settingsRows||{}; S.settingsRows['shcol_'+k]=o; saveSettings('shcol_'+k,o); } shcApply(); }
 function shcApply(){ var el=document.getElementById('shcStyle'); if(!el){ el=document.createElement('style'); el.id='shcStyle'; document.head.appendChild(el); }
   el.textContent=PEOPLE.map(function(k){ var q=shcGet(k); return q.on?Object.keys(SHC_DEF).map(function(c){ var v=/^#[0-9a-fA-F]{6}$/.test(q[c]||'')?q[c]:SHC_DEF[c]; return '.sh[data-k="'+k+'"][data-c="'+c+'"]{--pc:'+v+'!important}'; }).join(''):''; }).join(''); }
-function shcHTML(){ var o=shcGet(); return '<div class="fld"><span class="lbl">Schichten nach Art färben</span><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" data-shc="on"'+(o.on?' checked':'')+' style="width:22px;height:22px">Meine Früh-, Spät-, Nacht- und Tagdienst-Schichten bekommen eigene Farben statt meiner Personenfarbe</label>'
-  +(o.on?'<div class="eigw" style="margin-top:8px">'+Object.keys(SHC_DEF).map(function(c){ return '<label class="eigc"><span>'+SHC_L[c]+'</span><input type="color" data-shc="'+c+'" value="'+(/^#[0-9a-fA-F]{6}$/.test(o[c]||'')?o[c]:SHC_DEF[c])+'"></label>'; }).join('')+'</div><div class="btns"><button type="button" class="btn sm" data-a="shcreset">Standardfarben</button></div>':'')
-  +'<p class="hint">'+(S.me?'Gilt für die Schichten von '+esc(pname(S.me))+' und ist bei allen in der Familie so zu sehen. Die anderen stellen ihre Farben bei sich selbst ein.':'Wähle zuerst unter Menü → „Familie“ → „Wer bist du?“, wer du bist.')+'</p></div>'; }
-document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.shc) return; e.stopImmediatePropagation(); var o=JSON.parse(JSON.stringify(shcGet())); if(el.dataset.shc==='on') o.on=el.checked; else o[el.dataset.shc]=el.value; shcSave(o); renderSheet(); renderCal(); },true);
-document.addEventListener('input',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.shc||el.dataset.shc==='on') return; var o=JSON.parse(JSON.stringify(shcGet())); o[el.dataset.shc]=el.value; S.settingsRows=S.settingsRows||{}; if(S.me) S.settingsRows['shcol_'+S.me]=o; shcApply(); },true);
-document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="shcreset"]'); if(!t) return; e.stopImmediatePropagation(); shcSave({on:true}); renderSheet(); renderCal(); },true);
+function shcK(){ return (S.sheet==='plan'&&S.planForm&&S.planForm.k)||S.me; }
+function shcHTML(){ var k=shcK(); if(!k) return ''; var o=shcGet(k), t=shdGet(k);
+  return '<div class="fld" style="margin-top:14px"><span class="lbl">Schichtfarben & Schichtzeiten · <span style="color:var(--p-'+k+')">'+esc(pname(k))+'</span></span>'
+  +'<label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="checkbox" data-shc="on"'+(o.on?' checked':'')+' style="width:20px;height:20px">Eigene Farben je Schichtart</label>'
+  +Object.keys(SHC_DEF).map(function(c){ var v=t[c]||{};
+    return '<div class="shcr">'+(o.on?'<input type="color" data-shc="'+c+'" value="'+(/^#[0-9a-fA-F]{6}$/.test(o[c]||'')?o[c]:SHC_DEF[c])+'" aria-label="Farbe '+SHC_L[c]+'">':'')+'<span class="shcl">'+SHC_L[c]+'</span>'+(S.shdEd===c?'<button type="button" class="btn sm pri" style="margin-left:auto" data-a="shded" data-v="">Fertig</button></div><div class="btw" style="display:flex;align-items:center;gap:6px;margin:4px 0 8px">'+timeSelects('sd:'+c+':a',v.a||'',true)+'<span>bis</span>'+timeSelects('sd:'+c+':b',v.b||'',true)+'</div>':'<span class="shct">'+(v.a||v.b?esc((v.a||'--:--')+' – '+(v.b||'--:--')):'keine Zeit')+'</span><button type="button" class="btn sm" data-a="shded" data-v="'+c+'">Ändern</button></div>'); }).join('')
+  +'<div class="btns"><button type="button" class="btn sm" data-a="shdapply">Zeiten in alle Zeilen übernehmen</button>'+(o.on?'<button type="button" class="btn sm" data-a="shcreset">Standardfarben</button>':'')+'</div>'
+  +'<p class="hint">Wählst du in einer Zeile Früh, Spät, Nacht oder Tagdienst, steht die Uhrzeit gleich drin. Gilt für '+esc(pname(k))+'.</p></div>'; }
+document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.shc) return; e.stopImmediatePropagation(); var o=JSON.parse(JSON.stringify(shcGet(shcK()))); if(el.dataset.shc==='on') o.on=el.checked; else o[el.dataset.shc]=el.value; shcSave(o,shcK()); renderSheet(); renderCal(); },true);
+document.addEventListener('input',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.shc||el.dataset.shc==='on') return; var kk=shcK(), o=JSON.parse(JSON.stringify(shcGet(kk))); o[el.dataset.shc]=el.value; S.settingsRows=S.settingsRows||{}; if(kk) S.settingsRows['shcol_'+kk]=o; shcApply(); },true);
+document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="shcreset"]'); if(!t) return; e.stopImmediatePropagation(); shcSave({on:true},shcK()); renderSheet(); renderCal(); },true);
 
 // ---------- gemeinsame Helfer für Listen in den Einstellungen ----------
 function setList(id){ var r=(S.settingsRows||{})[id]; return (r&&Array.isArray(r.list))?r.list:[]; }
@@ -2815,6 +2821,7 @@ document.addEventListener('click',function(e){
     case 'pltoggle': if(S.planForm){ var pfo=S.planForm; pfo.open=pfo.open||{}; pfo.open[+t.dataset.i]=!pfo.open[+t.dataset.i];
       if(pfo.open[+t.dataset.i]){ var rw0=pfo.rows[+t.dataset.i]; rw0.d=rw0.d||{}; for(var jj0=0;jj0<rw0.n;jj0++) if(!rw0.d[jj0]&&(rw0.a||rw0.b)) rw0.d[jj0]={a:rw0.a||'',b:rw0.b||''}; }
       rerenderRows(); } break;
+    case 'shded': S.shdEd=t.dataset.v||''; renderSheet(); break;
     case 'shdapply': if(S.planForm){ var sdo=shdGet(S.planForm.k), nch=0; S.planForm.rows.forEach(function(r){ var d=sdo[r.c]; if(r.c!=='-'&&d&&(d.a||d.b)){ r.a=d.a||''; r.b=d.b||''; nch++; } }); S.planForm.text=rowsToText(S.planForm); renderSheet(); toast(nch?'Uhrzeiten übernommen.':'Keine passende Standardzeit eingetragen.'); } break;
     case 'planaddrow': if(S.planForm){ S.planForm.rows.push({c:'-',n:2,a:'',b:''}); S.planForm.text=rowsToText(S.planForm); renderSheet(); } break;
     case 'plandelrow': if(S.planForm&&S.planForm.rows.length>1){ S.planForm.rows.splice(+t.dataset.i,1); S.planForm.open={}; S.planForm.text=rowsToText(S.planForm); renderSheet(); } break;
