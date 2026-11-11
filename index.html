@@ -1681,7 +1681,25 @@ function wxFrame(ts){ var cv=WX.cv; if(!cv||cv.style.display==='none'){ WX.raf=0
   });
   if(k==='storm'){ var ph=t%9; if(ph<.18){ g.fillStyle='rgba(255,255,255,'+(.5*(1-ph/.18)).toFixed(2)+')'; g.fillRect(0,0,W,H); } }
   if(still){ WX.raf=0; return; } WX.raf=requestAnimationFrame(wxFrame); }
-setTimeout(function(){ wxLoad(); },1200); setInterval(function(){ wxLoad(); },5*60000); document.addEventListener('visibilitychange',function(){ if(!document.hidden) wxLoad(); });
+setTimeout(function(){ wxLoad(); },1200);
+// Funktionstest: alle 14 Tage still im Hintergrund, 3 Versuche je Dienst, bei fehlendem Empfang später erneut
+var FT={run:false};
+function ftWait(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+function ftTry(fn){ var n=0; function go(){ n++; return Promise.resolve().then(fn).then(function(ok){ if(ok) return true; throw 0; }).catch(function(){ if(n>=3) return false; return ftWait(n===1?15000:45000).then(go); }); } return go(); }
+function ftTimeout(p,ms){ return Promise.race([p,new Promise(function(_,rj){ setTimeout(function(){ rj(new Error('t')); },ms); })]); }
+function ftNet(){ return ftTimeout(fetch('https://api.open-meteo.com/v1/forecast?latitude=50.1&longitude=8.68&current=temperature_2m',{cache:'no-store',mode:'no-cors'}),8000).then(function(){ return true; }).catch(function(){ return false; }); }
+function ftRun(){ if(FT.run||!navigator.onLine||document.hidden) return; var now=Date.now(), last=+(lsGet('ft_t')||0), tryT=+(lsGet('ft_try')||0);
+  if(now-last<14*86400000||now-tryT<3600000) return; FT.run=true;
+  ftNet().then(function(net){ if(!net){ lsSet('ft_try',String(Date.now())); FT.run=false; return; }
+    var tests=[['Das Wetter',function(){ return ftTimeout(fetch('https://api.open-meteo.com/v1/forecast?latitude=50.1&longitude=8.68&current=temperature_2m,weather_code',{cache:'no-store'}),10000).then(function(r){ return r.json(); }).then(function(j){ return !!(j&&j.current&&typeof j.current.temperature_2m==='number'); }); }],
+      ['Die Karte',function(){ return new Promise(function(ok){ var im=new Image(); var t=setTimeout(function(){ ok(false); },10000); im.onload=function(){ clearTimeout(t); ok(true); }; im.onerror=function(){ clearTimeout(t); ok(false); }; im.src='https://tile.openstreetmap.org/0/0/0.png?ft='+Date.now(); }); }]];
+    if(ftWorker()) tests.push(['Der Fahrplan',function(){ return ftTimeout(ftPost({near:{lat:50.1072,lon:8.6638}}),15000).then(function(r){ return !!(r&&!r.err&&r.stops&&r.stops.length); }); }]);
+    var bad=[]; return tests.reduce(function(p,t){ return p.then(function(){ return ftTry(t[1]).then(function(ok){ if(!ok) bad.push(t[0]); }); }); },Promise.resolve()).then(function(){
+      return ftNet().then(function(net2){ if(!net2&&bad.length){ lsSet('ft_try',String(Date.now())); return; }
+        lsSet('ft_t',String(Date.now())); lsSet('ft_res',JSON.stringify({t:Date.now(),bad:bad}));
+        if(bad.length) toast(bad.join(' und ')+(bad.length>1?' antworten':' antwortet')+' nicht mehr richtig. Bitte bei Claude melden.'); }); }); }).catch(function(){}).then(function(){ FT.run=false; }); }
+setTimeout(ftRun,25000); setInterval(ftRun,6*3600000); document.addEventListener('visibilitychange',function(){ if(!document.hidden) setTimeout(ftRun,8000); });
+ setInterval(function(){ wxLoad(); },5*60000); document.addEventListener('visibilitychange',function(){ if(!document.hidden) wxLoad(); });
 /* ---------- Kontrast-Wächter: Schrift auf Hintergrundstilen immer lesbar ---------- */
 function ctRGB(css){ var p=ctRGB.p||(ctRGB.p=document.createElement('i')); p.style.cssText='position:absolute;visibility:hidden;color:'+css; document.body.appendChild(p); var c=getComputedStyle(p).color; document.body.removeChild(p); var m=c.match(/[\d.]+/g)||[0,0,0]; return /^color\(/.test(c)?[m[0]*255,m[1]*255,m[2]*255]:[+m[0],+m[1],+m[2]]; }
 function ctL(c){ var f=function(v){ v/=255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4); }; return .2126*f(c[0])+.7152*f(c[1])+.0722*f(c[2]); }
@@ -2631,7 +2649,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='11.11.2026 · 17:35';
+var APPVER='11.11.2026 · 17:40';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
