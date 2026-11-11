@@ -47,7 +47,7 @@ button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .app{max-width:1100px;margin:0 auto;padding-block:14px calc(var(--navb) + 96px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-.brand{font:700 19px/1 var(--f-display);letter-spacing:-.01em}.brandft{text-align:center;margin:22px 0 90px;opacity:.9}.dl{font-size:19px!important;font-weight:600!important}.top .brand{font-size:18px;line-height:1.15;min-width:0;white-space:nowrap}.top .brand .kwt{display:inline-block;margin-left:7px;font:600 12px var(--f-body);opacity:.85}.top .status{white-space:nowrap;font-size:12px}.top{gap:8px}.wkp{background:var(--surface);border:1.5px solid var(--line2);border-radius:14px;padding:8px 10px 10px;margin:0 0 10px;border-left:6px solid var(--pc)}.wkp h3{margin:0 0 6px;font:700 15px var(--f-display);color:var(--ink)}.wkp .wkd{font:600 12px var(--f-body);color:var(--ink-2);margin:8px 0 3px}.wkp .wkn{font-size:13px;color:var(--ink-2)}.wkh{margin:14px 0 8px;font:700 16px var(--f-display)}.date-title .kwt{font:600 .55em/1 var(--f-body);letter-spacing:0;margin-left:10px;white-space:nowrap;opacity:.85}.wxrow{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:6px 0 0}.wxrow .sub{margin:0}
+.brand{font:700 19px/1 var(--f-display);letter-spacing:-.01em}.brandft{text-align:center;margin:22px 0 90px;opacity:.9}.dl{font-size:18px!important;font-weight:700!important;line-height:1.15!important;letter-spacing:-.01em!important}.top .brand{font-size:18px;line-height:1.15;min-width:0;white-space:nowrap}.top .brand .kwt{display:inline-block;margin-left:7px;font:600 12px var(--f-body);opacity:.85}.top .status{white-space:nowrap;font-size:12px}.top{gap:8px;margin-bottom:2px}.wkp{background:var(--surface);border:1.5px solid var(--line2);border-radius:14px;padding:8px 10px 10px;margin:0 0 10px;border-left:6px solid var(--pc)}.wkp h3{margin:0 0 6px;font:700 15px var(--f-display);color:var(--ink)}.wkp .wkd{font:600 12px var(--f-body);color:var(--ink-2);margin:8px 0 3px}.wkp .wkn{font-size:13px;color:var(--ink-2)}.wkh{margin:14px 0 8px;font:700 16px var(--f-display)}.date-title .kwt{font:600 .55em/1 var(--f-body);letter-spacing:0;margin-left:10px;white-space:nowrap;opacity:.85}.wxrow{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:4px 0 0}.wxrow .sub{margin:0}
 .top-r{display:flex;align-items:center;gap:10px;min-width:0}
 .status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);min-width:0}
 .status i{width:8px;height:8px;border-radius:50%;background:var(--ink-2);flex:none}
@@ -1123,10 +1123,10 @@ function renderCal(){ try{ shcApply(); }catch(e){}
     return '<li><b>'+esc(r.label)+':</b> <span>'+esc(r.ev.title||(CAT[r.ev.cat]||CAT.sonst).l)+'</span><small>'+esc((r.ev.who||[]).map(pname).join(', '))+'</small></li>';
   }).join('')+'</ul></div>':'';
   // Kopf
-  var dayLong=new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric',month:'long'}).format(d);
+  var dayLong=new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric',month:'long'}).format(d), dayShort=new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric'}).format(d)+'.';
   
   var topT=new Intl.DateTimeFormat('de-DE',{month:'long',year:'numeric'}).format(d); S.topT='<span>'+esc(topT)+'</span><span class="kwt">KW '+isoWeek(sel)+'</span>'; updTopL();
-  $('#calHead').innerHTML='<div><h1 class="date-title dl">'+esc(dayLong)+'</h1>'+(WX.d?'<div class="wxrow">'+(WX.d.place?'<p class="sub wxloc">📍 '+esc(WX.d.place)+'</p>':'')+wxChipHTML()+'</div>':'')+wxFcHTML()+'</div>'
+  $('#calHead').innerHTML='<div><h1 class="date-title dl">'+esc(dayShort.replace(/\.\.$/,'.'))+'</h1>'+(WX.d?'<div class="wxrow">'+(WX.d.place?'<p class="sub wxloc">📍 '+esc(WX.d.place)+'</p>':'')+wxChipHTML()+'</div>':'')+wxFcHTML()+'</div>'
     +'<div class="navb"><div class="seg" role="group" aria-label="Ansicht"><button data-a="view" data-v="month" aria-pressed="'+(S.view==='month')+'">Monat</button><button data-a="view" data-v="week" aria-pressed="'+(S.view==='week')+'">Woche</button></div>'
     +'<button class="icon-btn" data-a="step" data-n="-1" aria-label="'+(S.view==='month'?'Ein Monat zurück':'Eine Woche zurück')+'">'+ic('chevL')+'</button>'
     +'<button class="btn sm" data-a="today">Heute</button>'
@@ -1171,7 +1171,7 @@ function renderCal(){ try{ shcApply(); }catch(e){}
   var bf=$('#brandft'); if(bf) bf.hidden=(S.view!=='month');
   var wo=$('#wkov'); if(wo){ if(S.view!=='week'){ wo.innerHTML=''; } else { var ws2=addDays(sel,-weekday(sel)), wh='';
     act.forEach(function(k){ var rows='', cnt=0;
-      for(var q=0;q<7;q++){ var ds=addDays(ws2,q), my=eventsOn(ds).filter(function(ev){ return !isAll(ev)&&(ev.who||[]).indexOf(k)>-1; });
+      for(var q=0;q<7;q++){ var ds=addDays(ws2,q), my=eventsOn(ds).filter(function(ev){ return !isAll(ev)&&!/^(frueh|tag|spaet|nacht|wende|muell)$/.test(ev.cat)&&(ev.who||[]).indexOf(k)>-1; });
         if(!my.length) continue; cnt+=my.length; rows+='<div class="wkd">'+WD[q]+', '+(+ds.slice(8))+'.'+ds.slice(5,7)+'.</div>'+my.map(function(ev){ return evCard(ev,k).replace('data-a="edit"','data-a="edit" data-d="'+ds+'"'); }).join(''); }
       wh+='<div class="wkp" style="--pc:var(--p-'+k+')"><h3>'+esc(pname(k))+'</h3>'+(cnt?rows:'<div class="wkn">'+(S.loaded.events?'Keine Termine in dieser Woche':'Lädt …')+'</div>')+'</div>'; });
     wo.innerHTML='<h2 class="wkh">Termine der Woche</h2>'+wh; } }
@@ -2624,7 +2624,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='11.11.2026 · 16:00';
+var APPVER='11.11.2026 · 16:30';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
