@@ -2649,7 +2649,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='11.11.2026 · 17:55';
+var APPVER='11.11.2026 · 18:05';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2676,7 +2676,7 @@ function eur(c){ c=Math.round(c||0); var neg=c<0; c=Math.abs(c); return (neg?'�
 function cents(v){ var t=String(v||'').replace(/[^\d,.\-]/g,''); if(/,\d{1,2}$/.test(t)) t=t.replace(/\./g,'').replace(',','.'); else t=t.replace(/,/g,''); var n=parseFloat(t); return isFinite(n)?Math.round(n*100):NaN; }
 
 // ---------- Haushaltskasse ----------
-var KCAT=[['lebensmittel','🛒','Lebensmittel'],['drogerie','🧴','Drogerie'],['tanken','⛽','Tanken & Auto'],['tabak','🚬','Tabak'],['haushalt','🏠','Haushalt'],['kinder','🧸','Kinder'],['freizeit','🎉','Freizeit'],['gesundheit','💊','Gesundheit'],['sonst','📦','Sonstiges']];
+var KCAT=[['lebensmittel','🛒','Lebensmittel'],['drogerie','🧴','Drogerie'],['tanken','⛽','Tanken & Auto'],['tabak','🚬','Tabak'],['essen','🍔','Restaurant & Fast Food'],['haushalt','🏠','Haushalt'],['kinder','🧸','Kinder'],['freizeit','🎉','Freizeit'],['gesundheit','💊','Gesundheit'],['sonst','📦','Sonstiges']];
 function kcat(k){ return KCAT.filter(function(c){ return c[0]===k; })[0]||KCAT[KCAT.length-1]; }
 function kShareOn(k){ var r=k?(S.settingsRows||{})['kshare_'+k]:null; return !!(r&&r.on); }
 function kVis(L){ var me=S.me||''; return L.filter(function(x){ var b=x.by||''; if(!b||b===me) return true; return kShareOn(me)&&kShareOn(b); }); }
@@ -2697,7 +2697,8 @@ function kVatHTML(o,brutto){ var ks=Object.keys(o).map(Number).sort(function(a,b
 function kNorm(n){ return String(n||'').toLowerCase().replace(/\b\d+([.,]\d+)?\s*(%|l|ml|cl|g|gr|kg|st|stk|stück|x|er|pack|pck)?\b/g,' ').replace(/[^a-zäöüß ]/g,' ').replace(/\b(bio|ja|gut|günstig|k|classic)\b/g,' ').replace(/\s+/g,' ').trim(); }
 function kSpecial(n){ var s=String(n||'').toLowerCase(); if(/zigarett|tabak|marlboro|camel\b|lucky strike|l&m\b|pall mall|winston|gauloises|chesterfield|\bjps\b|feuerzeug|blättchen|zigarillo|zigarre|\bheets\b|snus|\bvape/.test(s)) return 'tabak';
   if(/benzin|diesel|\bsuper\s?(e5|e10|plus)\b|^super$|\be10\b|\be5\b|kraftstoff|adblue|motoröl|getriebeöl|(^|\s)öl(\s|$)|scheibenwasch|scheibenreiniger|autowäsche|waschstraße|frostschutz|wischerblatt|zapfsäule|autogas|\blpg\b|\bsprit\b|tanken/.test(s)) return 'tanken'; return ''; }
-function kSkip(x,i){ return !!((x&&(x.cat==='tanken'||x.cat==='tabak'))||kSpecial(i&&i.n)); }
+function kFast(s){ return /mc\s?donald|burger\s?king|\bkfc\b|subway|pizzeria|restaurant|ristorante|trattoria|döner|doener|imbiss|vapiano|l'osteria|nordsee|gasthaus|gaststätte|five guys|domino|pizza hut|wienerwald|ihop|dunkin|starbucks|backwerk|burgerme|hans im glück/.test(String(s||'').toLowerCase()); }
+function kSkip(x,i){ return !!((x&&(x.cat==='tanken'||x.cat==='tabak'||x.cat==='essen'||kFast(x.shop)))||kSpecial(i&&i.n)); }
 function kNice(n){ n=String(n||'').replace(/\s+/g,' ').trim(); return n.charAt(0).toUpperCase()+n.slice(1); }
 function kRhythm(){ var by={}, today=ymd(new Date());
   kVis(setList('kasse')).forEach(function(x){ if(!x.d||!x.items) return; x.items.forEach(function(i){ if(!(i.c>0)||kSkip(x,i)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=by[k]=by[k]||{dates:{},name:i.n,last:'',q:''}; o.dates[x.d]=1; if(x.d>=o.last){ o.last=x.d; o.name=i.n; if(i.q) o.q=i.q; } }); });
@@ -2745,10 +2746,10 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
       var prompt='Du liest das Foto eines deutschen Kassenbons. Heute ist der '+ymd(new Date())+'.\n'
         +'Bereiche (Schlüssel = Name): '+KCAT.map(function(c){ return c[0]+' = '+c[2]; }).join(', ')+'.\n'
         +'Antworte NUR mit JSON: {"shop":"Name des Geschäfts, kurz","date":"JJJJ-MM-TT","total":"Gesamtbetrag (zu zahlen) als Zahl mit Punkt, z. B. 23.45","cat":"passender Bereich-Schlüssel","items":[{"n":"Artikel kurz","p":"Preis als Zahl","q":"Menge mit Einheit, wenn auf dem Bon zu lesen, z. B. 0,312 kg, 2 Stück, 500 g, 6x1,5 l; sonst leer lassen","r":"Mehrwertsteuersatz des Artikels in Prozent: 7 oder 19 (oder 0); ergibt sich meist aus dem Buchstaben hinter dem Preis (z. B. A/B, 1/2) und der Steuer-Legende unten auf dem Bon"}],"vat":[{"r":"Steuersatz 7 oder 19","g":"Bruttobetrag dieses Satzes","t":"enthaltene MwSt"}],"note":"kurzer Hinweis, falls etwas unleserlich war, sonst leer"}\n'
-        +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Zigaretten und Tabak gehören zum Bereich tabak, Benzin, Diesel, Öl und Autozubehör zum Bereich tanken. Erfinde nichts.';
+        +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Restaurants, Fast Food und Lieferdienste gehören zum Bereich essen, Zigaretten und Tabak zum Bereich tabak, Benzin, Diesel, Öl und Autozubehör zum Bereich tanken. Erfinde nichts.';
       S.sample.json(prompt,{images:[blob],modelTier:'default',cache:false}).then(function(r){ if(S.kScan!==sc) return; sc.busy=false; var f=S.kf; if(!f) return;
         var t=cents(String((r&&r.total)||'').replace('.',',')); if(!(t>0)){ sc.err=true; sc.msg='Ich konnte keinen Gesamtbetrag erkennen. Versuch ein schärferes Foto oder trag den Betrag selbst ein.'; hhRender(); return; }
-        f.amt=(t/100).toFixed(2).replace('.',','); if(r.shop) f.shop=String(r.shop).slice(0,40); if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')) f.date=r.date; if(kcat(r.cat)[0]===r.cat) f.cat=r.cat;
+        f.amt=(t/100).toFixed(2).replace('.',','); if(r.shop) f.shop=String(r.shop).slice(0,40); if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')) f.date=r.date; if(kcat(r.cat)[0]===r.cat) f.cat=r.cat; if(kFast(f.shop)) f.cat='essen';
         var rate=function(v){ var n=parseFloat(String(v===undefined||v===null?'':v).replace(',','.')); return n===7||n===19||n===0?n:(n===5||n===16?n:null); };
         f.items=((r&&Array.isArray(r.items))?r.items:[]).slice(0,60).map(function(i){ var o={n:String((i&&i.n)||'').slice(0,40),c:cents(String((i&&i.p)||'').replace('.',','))}, rr=rate(i&&i.r), qq=String((i&&i.q)||'').replace(/\s+/g,' ').trim().slice(0,16); if(rr!==null) o.r=rr; if(qq&&!/^(null|-|0)$/i.test(qq)) o.q=qq; return o; }).filter(function(i){ return i.n&&isFinite(i.c); });
         f.vat=((r&&Array.isArray(r.vat))?r.vat:[]).slice(0,4).map(function(v){ return {r:rate(v&&v.r),g:cents(String((v&&v.g)||'').replace('.',',')),t:cents(String((v&&v.t)||'').replace('.',','))}; }).filter(function(v){ return v.r!==null&&isFinite(v.g)&&isFinite(v.t); });
