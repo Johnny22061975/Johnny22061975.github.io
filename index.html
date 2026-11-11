@@ -1263,7 +1263,7 @@ document.addEventListener('click',function(e){ var box=e.target.closest&&e.targe
   var ch={who:v,aby:S.me||'',ats:Date.now()}; safe(function(){ return S.store.update(coll,id,ch); });
   if(v&&v!==S.me) toast(pname(v)+' wird benachrichtigt.'); },true);
 function kPriceMap(){ var m={}; kVis(setList('kasse')).forEach(function(x){ if(!x.d||!x.items||!x.shop) return; var sh=String(x.shop).trim().slice(0,24), sk=sh.toLowerCase().replace(/[^a-zäöüß0-9]/g,'');
-    x.items.forEach(function(i){ if(!(i.c>0)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=m[k]=m[k]||{}, e=o[sk]; if(!e||x.d>=e.d) o[sk]={shop:sh,c:i.c,d:x.d}; }); }); return m; }
+    x.items.forEach(function(i){ if(!(i.c>0)||kSkip(x,i)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=m[k]=m[k]||{}, e=o[sk]; if(!e||x.d>=e.d) o[sk]={shop:sh,c:i.c,d:x.d}; }); }); return m; }
 function kPriceLine(name){ var pm=S._pm; if(!pm) return ''; var k=kNorm(name); if(k.length<3) return ''; var o=pm[k];
   if(!o){ var ks=Object.keys(pm).filter(function(x){ return x.length>=4&&k.length>=4&&(x.indexOf(k)>-1||k.indexOf(x)>-1); }); if(!ks.length) return ''; o={}; ks.forEach(function(x){ Object.keys(pm[x]).forEach(function(s){ var e=pm[x][s]; if(!o[s]||e.d>o[s].d) o[s]=e; }); }); }
   var L=Object.keys(o).map(function(s){ return o[s]; }).sort(function(a,b){ return a.c-b.c; }).slice(0,4); if(!L.length) return '';
@@ -2649,7 +2649,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='11.11.2026 · 17:40';
+var APPVER='11.11.2026 · 17:55';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2676,7 +2676,7 @@ function eur(c){ c=Math.round(c||0); var neg=c<0; c=Math.abs(c); return (neg?'�
 function cents(v){ var t=String(v||'').replace(/[^\d,.\-]/g,''); if(/,\d{1,2}$/.test(t)) t=t.replace(/\./g,'').replace(',','.'); else t=t.replace(/,/g,''); var n=parseFloat(t); return isFinite(n)?Math.round(n*100):NaN; }
 
 // ---------- Haushaltskasse ----------
-var KCAT=[['lebensmittel','🛒','Lebensmittel'],['drogerie','🧴','Drogerie'],['tanken','⛽','Tanken & Auto'],['haushalt','🏠','Haushalt'],['kinder','🧸','Kinder'],['freizeit','🎉','Freizeit'],['gesundheit','💊','Gesundheit'],['sonst','📦','Sonstiges']];
+var KCAT=[['lebensmittel','🛒','Lebensmittel'],['drogerie','🧴','Drogerie'],['tanken','⛽','Tanken & Auto'],['tabak','🚬','Tabak'],['haushalt','🏠','Haushalt'],['kinder','🧸','Kinder'],['freizeit','🎉','Freizeit'],['gesundheit','💊','Gesundheit'],['sonst','📦','Sonstiges']];
 function kcat(k){ return KCAT.filter(function(c){ return c[0]===k; })[0]||KCAT[KCAT.length-1]; }
 function kShareOn(k){ var r=k?(S.settingsRows||{})['kshare_'+k]:null; return !!(r&&r.on); }
 function kVis(L){ var me=S.me||''; return L.filter(function(x){ var b=x.by||''; if(!b||b===me) return true; return kShareOn(me)&&kShareOn(b); }); }
@@ -2695,9 +2695,12 @@ function kVatHTML(o,brutto){ var ks=Object.keys(o).map(Number).sort(function(a,b
     +'<div class="kt"><span>Netto</span><b>'+eur(br-st)+'</b></div></div>'; }
 // Einkaufs-Rhythmus: lernt aus den Kassenbons, wie oft ein Artikel gekauft wird, und schreibt ihn rechtzeitig auf die Einkaufsliste
 function kNorm(n){ return String(n||'').toLowerCase().replace(/\b\d+([.,]\d+)?\s*(%|l|ml|cl|g|gr|kg|st|stk|stück|x|er|pack|pck)?\b/g,' ').replace(/[^a-zäöüß ]/g,' ').replace(/\b(bio|ja|gut|günstig|k|classic)\b/g,' ').replace(/\s+/g,' ').trim(); }
+function kSpecial(n){ var s=String(n||'').toLowerCase(); if(/zigarett|tabak|marlboro|camel\b|lucky strike|l&m\b|pall mall|winston|gauloises|chesterfield|\bjps\b|feuerzeug|blättchen|zigarillo|zigarre|\bheets\b|snus|\bvape/.test(s)) return 'tabak';
+  if(/benzin|diesel|\bsuper\s?(e5|e10|plus)\b|^super$|\be10\b|\be5\b|kraftstoff|adblue|motoröl|getriebeöl|(^|\s)öl(\s|$)|scheibenwasch|scheibenreiniger|autowäsche|waschstraße|frostschutz|wischerblatt|zapfsäule|autogas|\blpg\b|\bsprit\b|tanken/.test(s)) return 'tanken'; return ''; }
+function kSkip(x,i){ return !!((x&&(x.cat==='tanken'||x.cat==='tabak'))||kSpecial(i&&i.n)); }
 function kNice(n){ n=String(n||'').replace(/\s+/g,' ').trim(); return n.charAt(0).toUpperCase()+n.slice(1); }
 function kRhythm(){ var by={}, today=ymd(new Date());
-  kVis(setList('kasse')).forEach(function(x){ if(!x.d||!x.items) return; x.items.forEach(function(i){ if(!(i.c>0)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=by[k]=by[k]||{dates:{},name:i.n,last:'',q:''}; o.dates[x.d]=1; if(x.d>=o.last){ o.last=x.d; o.name=i.n; if(i.q) o.q=i.q; } }); });
+  kVis(setList('kasse')).forEach(function(x){ if(!x.d||!x.items) return; x.items.forEach(function(i){ if(!(i.c>0)||kSkip(x,i)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=by[k]=by[k]||{dates:{},name:i.n,last:'',q:''}; o.dates[x.d]=1; if(x.d>=o.last){ o.last=x.d; o.name=i.n; if(i.q) o.q=i.q; } }); });
   return Object.keys(by).map(function(k){ var o=by[k], ds=Object.keys(o.dates).sort(); if(ds.length<3) return null;
     var gaps=[]; for(var q=1;q<ds.length;q++) gaps.push(Math.round((new Date(ds[q])-new Date(ds[q-1]))/86400000)); gaps.sort(function(a,b){ return a-b; });
     var iv=gaps[Math.floor(gaps.length/2)]; if(!(iv>=3&&iv<=60)) return null; var since=Math.round((new Date(today)-new Date(o.last))/86400000);
@@ -2709,7 +2712,7 @@ function kAutoShop(force){ if(!S.store||!S.loaded||!S.loaded.shop||!S.loaded.set
   var ts=Date.now(); add.slice(0,15).forEach(function(r,i){ st[r.key]=ymd(new Date()); var id=S.store.newId(); safe(function(){ return S.store.set('shop',id,{name:r.name.slice(0,80),q:String(r.q||'').slice(0,16),who:'',done:false,ts:ts+i,by:S.me||'',ai:true,aiNote:'kaufst du etwa alle '+r.iv+' Tage'}); }); });
   S.settingsRows=S.settingsRows||{}; S.settingsRows.kai=st; saveSettings('kai',st); }
 function kToVorrat(rec){ if(!hhOn('vorrat')||!rec.items||!rec.items.length) return 0; var L=setList('vorrat').slice(), n=0;
-  rec.items.forEach(function(i){ if(!(i.c>0)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var v=L.filter(function(y){ return kNorm(y.name)===k; })[0];
+  rec.items.forEach(function(i){ if(!(i.c>0)||kSkip(rec,i)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var v=L.filter(function(y){ return kNorm(y.name)===k; })[0];
     if(v){ L=L.map(function(y){ return y===v?Object.assign({},y,{qty:Math.min(999,(y.qty||0)+1),last:i.q||y.last||''}):y; }); } else L.push({id:S.store.newId(),name:kNice(i.n).slice(0,40),qty:1,min:0,unit:'',last:i.q||''}); n++; });
   if(n) setListSave('vorrat',L); return n; }
 function kGrab(){ var f=S.kf; if(!f) return; [['amt','kAmt'],['shop','kShop'],['note','kNote']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
@@ -2742,7 +2745,7 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
       var prompt='Du liest das Foto eines deutschen Kassenbons. Heute ist der '+ymd(new Date())+'.\n'
         +'Bereiche (Schlüssel = Name): '+KCAT.map(function(c){ return c[0]+' = '+c[2]; }).join(', ')+'.\n'
         +'Antworte NUR mit JSON: {"shop":"Name des Geschäfts, kurz","date":"JJJJ-MM-TT","total":"Gesamtbetrag (zu zahlen) als Zahl mit Punkt, z. B. 23.45","cat":"passender Bereich-Schlüssel","items":[{"n":"Artikel kurz","p":"Preis als Zahl","q":"Menge mit Einheit, wenn auf dem Bon zu lesen, z. B. 0,312 kg, 2 Stück, 500 g, 6x1,5 l; sonst leer lassen","r":"Mehrwertsteuersatz des Artikels in Prozent: 7 oder 19 (oder 0); ergibt sich meist aus dem Buchstaben hinter dem Preis (z. B. A/B, 1/2) und der Steuer-Legende unten auf dem Bon"}],"vat":[{"r":"Steuersatz 7 oder 19","g":"Bruttobetrag dieses Satzes","t":"enthaltene MwSt"}],"note":"kurzer Hinweis, falls etwas unleserlich war, sonst leer"}\n'
-        +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Erfinde nichts.';
+        +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Zigaretten und Tabak gehören zum Bereich tabak, Benzin, Diesel, Öl und Autozubehör zum Bereich tanken. Erfinde nichts.';
       S.sample.json(prompt,{images:[blob],modelTier:'default',cache:false}).then(function(r){ if(S.kScan!==sc) return; sc.busy=false; var f=S.kf; if(!f) return;
         var t=cents(String((r&&r.total)||'').replace('.',',')); if(!(t>0)){ sc.err=true; sc.msg='Ich konnte keinen Gesamtbetrag erkennen. Versuch ein schärferes Foto oder trag den Betrag selbst ein.'; hhRender(); return; }
         f.amt=(t/100).toFixed(2).replace('.',','); if(r.shop) f.shop=String(r.shop).slice(0,40); if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')) f.date=r.date; if(kcat(r.cat)[0]===r.cat) f.cat=r.cat;
@@ -2794,8 +2797,14 @@ function hhClick(a,t){ var L,i,x;
   if(a==='kedit'){ x=setList('kasse').filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.kScan=null; S.kf={id:x.id,amt:(x.c/100).toFixed(2).replace('.',','),shop:x.shop||'',date:x.d,cat:x.cat,note:x.note||'',items:x.items||[],vat:x.vat||[]}; hhRender(); shTop(); return true; }
   if(a==='kcat'){ kGrab(); S.kf.cat=t.dataset.v; hhRender(); return true; }
   if(a==='ksave'){ kGrab(); var f=S.kf, c=cents(f.amt); if(!(c>0)){ f.msg='Bitte einen Betrag eintragen.'; hhRender(); return true; } if(!/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')) f.date=ymd(new Date());
+    var kExtra=[], kNoMain=false; if(!f.id&&f.items&&f.items.length){ var gs={tabak:[],tanken:[]}, rest=[]; f.items.forEach(function(i){ var g=kSpecial(i.n); if(g&&i.c>0) gs[g].push(i); else rest.push(i); });
+      var sumc=function(a){ return a.reduce(function(s,i){ return s+i.c; },0); }, ng=(gs.tabak.length?1:0)+(gs.tanken.length?1:0), restC=sumc(rest.filter(function(i){ return i.c>0; }));
+      if(ng&&!(ng===1&&!restC)){ var kd=/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')?f.date:ymd(new Date()), sx=0;
+        ['tabak','tanken'].forEach(function(g){ if(gs[g].length){ var sg=sumc(gs[g]); sx+=sg; kExtra.push({id:S.store.newId(),c:sg,shop:String(f.shop||'').trim().slice(0,40),d:kd,cat:g,note:String(f.note||'').trim().slice(0,80),by:S.me||'',ts:Date.now(),items:gs[g]}); } });
+        if(sx<c&&restC){ c=c-sx; f.items=rest; if(f.cat==='tanken'||f.cat==='tabak') f.cat='lebensmittel'; } else { kNoMain=true; }
+      } else if(ng===1&&!restC){ f.cat=gs.tabak.length?'tabak':'tanken'; } }
     var rec={id:f.id||S.store.newId(),c:c,shop:String(f.shop||'').trim().slice(0,40),d:f.date,cat:f.cat||'sonst',note:String(f.note||'').trim().slice(0,80),by:S.me||'',ts:Date.now()}; if(f.items&&f.items.length) rec.items=f.items.slice(0,60); if(f.vat&&f.vat.length) rec.vat=f.vat.slice(0,4); if(f.id){ var old=setList('kasse').filter(function(y){ return y.id===f.id; })[0]; if(old&&old.by) rec.by=old.by; }
-    L=setList('kasse').filter(function(y){ return y.id!==rec.id; }); L.push(rec); if(L.length>3000) L=L.sort(function(a2,b2){ return a2.d<b2.d?1:-1; }).slice(0,3000); setListSave('kasse',L); var nv=f.id?0:kToVorrat(rec); S.kYm=rec.d.slice(0,7); S.kf=null; S.kScan=null; toast('Gespeichert: '+eur(c)+(nv?' · '+nv+' Artikel in den Vorräten':'')); setTimeout(function(){ kAutoShop(true); },800); hhRender(); shTop(); return true; }
+    L=setList('kasse').filter(function(y){ return y.id!==rec.id; }); if(!kNoMain) L.push(rec); kExtra.forEach(function(r2){ L.push(r2); }); if(L.length>3000) L=L.sort(function(a2,b2){ return a2.d<b2.d?1:-1; }).slice(0,3000); setListSave('kasse',L); var nv=f.id||kNoMain?0:kToVorrat(rec); S.kYm=rec.d.slice(0,7); S.kf=null; S.kScan=null; toast('Gespeichert: '+eur(c)+(nv?' · '+nv+' Artikel in den Vorräten':'')); setTimeout(function(){ kAutoShop(true); },800); hhRender(); shTop(); return true; }
   if(a==='kdel'){ if(!S.kf.del){ kGrab(); S.kf.del=true; hhRender(); return true; } var kid=S.kf.id; setListSave('kasse',setList('kasse').filter(function(y){ return y.id!==kid; })); S.kf=null; hhRender(); return true; }
   if(a==='vnew'){ S.vf={qty:1,min:1}; hhRender(); shTop(); return true; }
   if(a==='vedit'){ x=setList('vorrat').filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.vf={id:x.id,name:x.name,qty:x.qty,min:x.min,unit:x.unit||'',last:x.last||''}; hhRender(); shTop(); return true; }
