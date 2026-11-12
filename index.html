@@ -856,8 +856,12 @@ function reminders(){
   });
   BINS.forEach(function(b){ var c=S.muell[b.k]; if(c.remind&&binDue(c,tm)&&nowHM()>=binTime(b.k)) out.push({bin:b,label:'Morgen',ord:1}); });
   (S.contacts||[]).forEach(function(c){ if(!c.bday||!c.remind||!c.name) return; var nb=bdayNext(c,t), dd=dayNum(nb)-dayNum(t), lim={day:0,d1:1,d3:3,d7:7}[c.remind]; if(lim===undefined||dd>lim) return; if(dd===lim&&nowHM()<(c.remAt||'00:00')) return; out.push({ev:bdayEv(c,nb),label:dd===0?'Heute':dd===1?'Morgen':'In '+dd+' Tagen',ord:dd===0?0:1}); });
+  var rx=remxGet(); out=out.filter(function(r){ return rx.k.indexOf(remxKey(r))<0; });
   return out.sort(function(a,b){ return a.ord-b.ord; });
 }
+function remxKey(r){ return r.bin?'b'+r.bin.k:'e'+(r.ev&&r.ev.id)+(r.label||''); }
+function remxGet(){ var t=ymd(new Date()); try{ var o=JSON.parse(localStorage.getItem('fp2_remx')||'{}'); if(o.d===t&&Array.isArray(o.k)) return o; }catch(e){} return {d:t,k:[]}; }
+function remxAdd(k){ var o=remxGet(); if(o.k.indexOf(k)<0) o.k.push(k); try{ localStorage.setItem('fp2_remx',JSON.stringify(o)); }catch(e){} }
 function dmy(s){ return s.slice(8)+'.'+s.slice(5,7)+'.'; }
 
 /* ---------- Anzeige ---------- */
@@ -1119,8 +1123,8 @@ function renderCal(){ try{ shcApply(); }catch(e){}
   // Erinnerungen
   var rm=reminders();
   $('#remind').innerHTML=rm.length?'<div class="remind"><h2>'+ic('bell',18)+'Heute dran denken</h2><ul>'+rm.map(function(r){
-    if(r.bin) return '<li><b>'+esc(r.label)+':</b> <span class="sq" style="--bc:var(--bin-'+r.bin.k+')"></span><span>'+esc(r.bin.l)+' rausstellen</span><small>'+esc(r.bin.s)+'</small></li>';
-    return '<li><b>'+esc(r.label)+':</b> <span>'+esc(r.ev.title||(CAT[r.ev.cat]||CAT.sonst).l)+'</span><small>'+esc((r.ev.who||[]).map(pname).join(', '))+'</small></li>';
+    if(r.bin) return '<li><b>'+esc(r.label)+':</b> <span class="sq" style="--bc:var(--bin-'+r.bin.k+')"></span><span>'+esc(r.bin.l)+' rausstellen</span><small>'+esc(r.bin.s)+'</small><button class="icon-btn" data-a="remx" data-k="'+esc(remxKey(r))+'" aria-label="Erinnerung ausblenden" style="margin-left:auto;width:28px;height:28px;min-width:28px">✕</button></li>';
+    return '<li><b>'+esc(r.label)+':</b> <span>'+esc(r.ev.title||(CAT[r.ev.cat]||CAT.sonst).l)+'</span><small>'+esc((r.ev.who||[]).map(pname).join(', '))+'</small><button class="icon-btn" data-a="remx" data-k="'+esc(remxKey(r))+'" aria-label="Erinnerung ausblenden" style="margin-left:auto;width:28px;height:28px;min-width:28px">✕</button></li>';
   }).join('')+'</ul></div>':'';
   // Kopf
   var dayLong=new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric',month:'long'}).format(d), dayShort=new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric'}).format(d)+'.';
@@ -2663,7 +2667,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='12.11.2026 · 17:20';
+var APPVER='12.11.2026 · 22:01';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -3044,6 +3048,7 @@ document.addEventListener('click',function(e){
   var a=t.dataset.a, f=S.form;
   if(a==='scrim'){ if(e.target===t) closeSheet(); return; }
   switch(a){
+    case 'remx': remxAdd(t.dataset.k); renderCal(); break;
     case 'wxinfo': S.wxOpen=!S.wxOpen; try{ renderAll(); }catch(e){} break;
     case 'bgwx': (function(){ var sf=S.bgEdit?'@'+S.bgEdit:''; lsSet('bgm'+sf,'wx'); applyBg(); renderSheet(); })(); break;
     case 'goreset': MAPV.goD=''; MAPV.goT=''; (function(){ var old=document.querySelector('.mgow'); if(!old) return; var tmp=document.createElement('div'); tmp.innerHTML=mapSkeleton(); var nw=tmp.querySelector('.mgow'); if(nw){ old.replaceWith(nw); initWheels(nw); } })(); break;
