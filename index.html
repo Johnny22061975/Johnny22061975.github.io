@@ -726,7 +726,7 @@ function pname(k){ return (S.people[k]&&S.people[k].name)||k; }
 function activePeople(){ var a=PEOPLE.filter(function(k){ return S.people[k].active; }); if(!a.length) return [PEOPLE[0]]; if(S.me&&a.indexOf(S.me)>0){ a=[S.me].concat(a.filter(function(k){ return k!==S.me; })); } return a; }
 function findRow(rows,id){ var r=null; rows.forEach(function(x){ if(x.id===id) r=x; }); return r; }
 function applySettings(rows){
-  S.settingsRows={}; rows.forEach(function(r){ S.settingsRows[r.id]=r; }); meAuto();
+  S.settingsRows={}; rows.forEach(function(r){ S.settingsRows[r.id]=r; }); S.settingsReady=true; meAuto();
   setTimeout(function(){ if(S.me&&!(S.settingsRows||{})['look_'+S.me]&&S.fbUser) lookBackup(); else lookRestore(); },0);
   var scl=findRow(rows,'schoolcal'); S.schoolCal=(scl&&scl.m&&typeof scl.m==='object')?scl.m:{};
   var rof=findRow(rows,'roworder'); S.rowOrd=(rof&&rof.p&&typeof rof.p==='object')?rof.p:{};
@@ -1306,7 +1306,11 @@ function chatMsgs(id){ return (S.notes||[]).filter(function(n){ return (n.chat||
 function rcpt(k){ return (S.settingsRows||{})['rcpt_'+k]||{}; }
 function rcptSave(ch){ if(!S.me||!S.store) return; var sv=rcpt(S.me)||{}, mi=S.rcptMine||{}, o={rcv:Math.max(sv.rcv||0,mi.rcv||0),rd:{}}; if(sv.ack) o.ack=1; [sv.rd||{},mi.rd||{}].forEach(function(r){ Object.keys(r).forEach(function(k){ o.rd[k]=Math.max(o.rd[k]||0,r[k]||0); }); }); var dirty=false;
   if(ch.rcv&&ch.rcv>(o.rcv||0)){ o.rcv=ch.rcv; dirty=true; } if(ch.cid&&ch.rd&&ch.rd>(o.rd[ch.cid]||0)){ o.rd[ch.cid]=ch.rd; if((o.rcv||0)<ch.rd) o.rcv=ch.rd; dirty=true; }
-  if(!dirty) return; S.rcptMine=o; clearTimeout(S.rcptT); S.rcptT=setTimeout(function(){ saveSettings('rcpt_'+S.me,S.rcptMine); },1500); }
+  if(!dirty) return; S.rcptMine=o; clearTimeout(S.rcptT); S.rcptT=setTimeout(function(){ rcptFlush(0); },1500); }
+// Beim Speichern erst die aktuellen Serverwerte einmischen und nie speichern, bevor die Einstellungen geladen sind (sonst gehen "gelesen"/"angekommen" verloren)
+function rcptFlush(n){ if(!S.me||!S.store) return; if(!S.settingsReady&&n<15){ clearTimeout(S.rcptT); S.rcptT=setTimeout(function(){ rcptFlush(n+1); },2000); return; } if(!S.settingsReady) return;
+  var sv=rcpt(S.me)||{}, mi=S.rcptMine||{}, o={rcv:Math.max(sv.rcv||0,mi.rcv||0),rd:{}}; if(sv.ack||mi.ack) o.ack=1; [sv.rd||{},mi.rd||{}].forEach(function(r){ Object.keys(r).forEach(function(k){ o.rd[k]=Math.max(o.rd[k]||0,r[k]||0); }); });
+  S.rcptMine=o; S.settingsRows=S.settingsRows||{}; S.settingsRows['rcpt_'+S.me]=Object.assign({id:'rcpt_'+S.me},o); saveSettings('rcpt_'+S.me,o); }
 function rcptHTML(c,n){ var to=(c.fam?activePeople():(c.members||[])).filter(function(k){ return k!==S.me&&!isGenName(k)&&PEOPLE.indexOf(k)>-1&&!(S.people[k]&&S.people[k].nophone); }); if(!to.length) return '';
   var rd=to.filter(function(k){ var r=rcpt(k); return ((r.rd||{})[c.id]||0)>=n.ts; }), dl=to.every(function(k){ return rd.indexOf(k)>-1||(rcpt(k).rcv||0)>=n.ts; });
   var late=!dl&&Date.now()-n.ts>10000; if(!dl&&!late){ clearTimeout(S.rcptRT); S.rcptRT=setTimeout(function(){ if(S.tab==='notes'&&S.chatOpen) renderNotes(); },Math.max(500,10500-(Date.now()-n.ts))); }
@@ -2659,7 +2663,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='11.11.2026 · 19:58';
+var APPVER='12.11.2026 · 17:20';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
