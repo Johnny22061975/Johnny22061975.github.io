@@ -2687,7 +2687,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='14.11.2026 · 15:16';
+var APPVER='14.11.2026 · 22:08';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2736,6 +2736,7 @@ function kNorm(n){ return String(n||'').toLowerCase().replace(/\b\d+([.,]\d+)?\s
 function kSpecial(n){ var s=String(n||'').toLowerCase(); if(/zigarett|tabak|marlboro|camel\b|lucky strike|l&m\b|pall mall|winston|gauloises|chesterfield|\bjps\b|feuerzeug|blättchen|zigarillo|zigarre|\bheets\b|snus|\bvape/.test(s)) return 'tabak';
   if(/benzin|diesel|\bsuper\s?(e5|e10|plus)\b|^super$|\be10\b|\be5\b|kraftstoff|adblue|motoröl|getriebeöl|(^|\s)öl(\s|$)|scheibenwasch|scheibenreiniger|autowäsche|waschstraße|frostschutz|wischerblatt|zapfsäule|autogas|\blpg\b|\bsprit\b|tanken/.test(s)) return 'tanken'; return ''; }
 function kFast(s){ return /mc\s?donald|burger\s?king|\bkfc\b|subway|pizzeria|restaurant|ristorante|trattoria|döner|doener|imbiss|vapiano|l'osteria|nordsee|gasthaus|gaststätte|five guys|domino|pizza hut|wienerwald|ihop|dunkin|starbucks|backwerk|burgerme|hans im glück/.test(String(s||'').toLowerCase()); }
+function kFuel(s){ return /tankstelle|\baral\b|\bshell\b|\besso\b|\bjet\b|\bomv\b|\bagip\b|\bavia\b|\btotalenergies\b|\bhem\b|\bbft\b|\bhoyer\b|tank\s?&\s?rast|autohof|raststätte|kiosk|späti|spätkauf|trinkhalle|büdchen/.test(String(s||'').toLowerCase()); }
 function kSkip(x,i){ return !!((x&&(x.cat==='tanken'||x.cat==='tabak'||x.cat==='essen'||kFast(x.shop)))||kSpecial(i&&i.n)); }
 function kNice(n){ n=String(n||'').replace(/\s+/g,' ').trim(); return n.charAt(0).toUpperCase()+n.slice(1); }
 function kRhythm(){ var by={}, today=ymd(new Date());
@@ -2836,12 +2837,12 @@ function hhClick(a,t){ var L,i,x;
   if(a==='kedit'){ x=setList('kasse').filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.kScan=null; S.kf={id:x.id,amt:(x.c/100).toFixed(2).replace('.',','),shop:x.shop||'',date:x.d,cat:x.cat,note:x.note||'',items:x.items||[],vat:x.vat||[]}; hhRender(); shTop(); return true; }
   if(a==='kcat'){ kGrab(); S.kf.cat=t.dataset.v; hhRender(); return true; }
   if(a==='ksave'){ kGrab(); var f=S.kf, c=cents(f.amt); if(!(c>0)){ f.msg='Bitte einen Betrag eintragen.'; hhRender(); return true; } if(!/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')) f.date=ymd(new Date());
-    var kExtra=[], kNoMain=false; if(!f.id&&f.items&&f.items.length){ var gs={tabak:[],tanken:[]}, rest=[]; f.items.forEach(function(i){ var g=kSpecial(i.n); if(g&&i.c>0) gs[g].push(i); else rest.push(i); });
-      var sumc=function(a){ return a.reduce(function(s,i){ return s+i.c; },0); }, ng=(gs.tabak.length?1:0)+(gs.tanken.length?1:0), restC=sumc(rest.filter(function(i){ return i.c>0; }));
+    var kExtra=[], kNoMain=false; if(!f.id&&f.items&&f.items.length){ var gs={tabak:[],tanken:[],essen:[]}, rest=[], fuelShop=kFuel(f.shop); f.items.forEach(function(i){ var g=kSpecial(i.n); if(g&&i.c>0) gs[g].push(i); else if(fuelShop&&!g) gs.essen.push(i); else rest.push(i); });
+      var sumc=function(a){ return a.reduce(function(s,i){ return s+i.c; },0); }, ng=(gs.tabak.length?1:0)+(gs.tanken.length?1:0)+(gs.essen.length?1:0), restC=sumc(rest.filter(function(i){ return i.c>0; }));
       if(ng&&!(ng===1&&!restC)){ var kd=/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')?f.date:ymd(new Date()), sx=0;
-        ['tabak','tanken'].forEach(function(g){ if(gs[g].length){ var sg=sumc(gs[g]); sx+=sg; kExtra.push({id:S.store.newId(),c:sg,shop:String(f.shop||'').trim().slice(0,40),d:kd,cat:g,note:String(f.note||'').trim().slice(0,80),by:S.me||'',ts:Date.now(),items:gs[g]}); } });
-        if(sx<c&&restC){ c=c-sx; f.items=rest; if(f.cat==='tanken'||f.cat==='tabak') f.cat='lebensmittel'; } else { kNoMain=true; }
-      } else if(ng===1&&!restC){ f.cat=gs.tabak.length?'tabak':'tanken'; } }
+        ['tabak','tanken','essen'].forEach(function(g){ if(gs[g].length){ var sg=sumc(gs[g]); sx+=sg; kExtra.push({id:S.store.newId(),c:sg,shop:String(f.shop||'').trim().slice(0,40),d:kd,cat:g,note:String(f.note||'').trim().slice(0,80),by:S.me||'',ts:Date.now(),items:gs[g]}); } });
+        if(sx<c&&restC){ c=c-sx; f.items=rest; if(f.cat==='tanken'||f.cat==='tabak'||f.cat==='essen') f.cat='lebensmittel'; } else { kNoMain=true; }
+      } else if(ng===1&&!restC){ f.cat=gs.tabak.length?'tabak':gs.tanken.length?'tanken':'essen'; } }
     var rec={id:f.id||S.store.newId(),c:c,shop:String(f.shop||'').trim().slice(0,40),d:f.date,cat:f.cat||'sonst',note:String(f.note||'').trim().slice(0,80),by:S.me||'',ts:Date.now()}; if(f.items&&f.items.length) rec.items=f.items.slice(0,60); if(f.vat&&f.vat.length) rec.vat=f.vat.slice(0,4); if(f.id){ var old=setList('kasse').filter(function(y){ return y.id===f.id; })[0]; if(old&&old.by) rec.by=old.by; }
     L=setList('kasse').filter(function(y){ return y.id!==rec.id; }); if(!kNoMain) L.push(rec); kExtra.forEach(function(r2){ L.push(r2); }); if(L.length>3000) L=L.sort(function(a2,b2){ return a2.d<b2.d?1:-1; }).slice(0,3000); setListSave('kasse',L); var nv=f.id||kNoMain?0:kToVorrat(rec); S.kYm=rec.d.slice(0,7); S.kf=null; S.kScan=null; toast('Gespeichert: '+eur(c)+(nv?' · '+nv+' Artikel in den Vorräten':'')); setTimeout(function(){ kAutoShop(true); },800); hhRender(); shTop(); return true; }
   if(a==='kdel'){ if(!S.kf.del){ kGrab(); S.kf.del=true; hhRender(); return true; } var kid=S.kf.id; setListSave('kasse',setList('kasse').filter(function(y){ return y.id!==kid; })); S.kf=null; hhRender(); return true; }
