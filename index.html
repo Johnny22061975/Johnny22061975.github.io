@@ -2683,7 +2683,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='13.11.2026 · 17:04';
+var APPVER='13.11.2026 · 18:20';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -3738,6 +3738,8 @@ function pushSync(){ if(!S.store||!S.fbUser||!window.FP_PUSH) return;
     if(js!==cur&&js!==pushLast&&(!row||row.day!==t0||(S.lastEdit||0)>(row.ts||0)||(row.ts||0)<Date.now()-6*3600000)){ pushLast=js; S.store.set('settings','pushplan',{items:it,day:t0,ts:Date.now(),by:S.me||''}); } }catch(e){}
   var cfg=pushRows().pushcfg; if(lsGet('pushid')&&cfg&&cfg.vapid&&(!pushInit||lsGet('pushme')!==(S.me||''))){ pushInit=true; pushEnable(false); } }
 setInterval(pushSync,60000); setTimeout(pushSync,8000);
+function nativeSync(){ try{ if(!window.FPNative||!S.events) return; var t=ymd(new Date()), me=S.me, arr=[]; S.events.forEach(function(ev){ if(!occursOn(ev,t)) return; if(ev.who&&ev.who.length&&me&&ev.who.indexOf(me)<0) return; arr.push({t:ev.start||'',n:ev.title||(CAT[ev.cat]||CAT.sonst).l}); }); arr.sort(function(x,y){ return (x.t||'99').localeCompare(y.t||'99'); }); var js=JSON.stringify({d:t,e:arr.slice(0,8)}); if(js!==S.natLast){ S.natLast=js; window.FPNative.setToday(js); } }catch(e){} }
+setInterval(nativeSync,60000); setTimeout(nativeSync,6000);
 function wrapStore(st){ var w={}; Object.keys(st).forEach(function(k){ w[k]=st[k]; });
   ['set','update','remove'].forEach(function(m){ w[m]=function(c,id){ if(!(c==='settings'&&id==='pushplan')&&c!=='push'&&c!=='pushsrv'&&c!=='notes'&&c!=='shop'){ S.lastEdit=Date.now(); clearTimeout(pushT); pushT=setTimeout(pushSync,3000); } return st[m].apply(st,arguments); }; });
   return w; }
