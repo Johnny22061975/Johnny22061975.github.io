@@ -2687,7 +2687,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='14.11.2026 · 10:50';
+var APPVER='14.11.2026 · 13:24';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -3742,7 +3742,18 @@ function pushSync(){ if(!S.store||!S.fbUser||!window.FP_PUSH) return;
     if(js!==cur&&js!==pushLast&&(!row||row.day!==t0||(S.lastEdit||0)>(row.ts||0)||(row.ts||0)<Date.now()-6*3600000)){ pushLast=js; S.store.set('settings','pushplan',{items:it,day:t0,ts:Date.now(),by:S.me||''}); } }catch(e){}
   var cfg=pushRows().pushcfg; if(lsGet('pushid')&&cfg&&cfg.vapid&&(!pushInit||lsGet('pushme')!==(S.me||''))){ pushInit=true; pushEnable(false); } }
 setInterval(pushSync,60000); setTimeout(pushSync,8000);
-function nativeSync(){ try{ if(!window.FPNative||!S.events) return; var t=ymd(new Date()), me=S.me, arr=[]; S.events.forEach(function(ev){ if(!occursOn(ev,t)) return; if(ev.who&&ev.who.length&&me&&ev.who.indexOf(me)<0) return; arr.push({t:ev.start||'',n:ev.title||(CAT[ev.cat]||CAT.sonst).l}); }); arr.sort(function(x,y){ return (x.t||'99').localeCompare(y.t||'99'); }); var js=JSON.stringify({d:t,e:arr.slice(0,8)}); if(js!==S.natLast){ S.natLast=js; window.FPNative.setToday(js); } }catch(e){} }
+function nativeSync(){ try{ if(!window.FPNative||!S.events) return; var t=ymd(new Date()), me=S.me, arr=[]; S.events.forEach(function(ev){ if(!occursOn(ev,t)) return; if(ev.who&&ev.who.length&&me&&ev.who.indexOf(me)<0) return; arr.push({t:ev.start||'',n:ev.title||(CAT[ev.cat]||CAT.sonst).l}); }); arr.sort(function(x,y){ return (x.t||'99').localeCompare(y.t||'99'); }); var js=JSON.stringify({d:t,e:arr.slice(0,8)}); if(js!==S.natLast){ S.natLast=js; window.FPNative.setToday(js); } nativeMonths(); }catch(e){} }
+function nativeMonths(){ try{ if(!window.FPNative||!window.FPNative.setMonths||!S.events) return; var cs=getComputedStyle(document.documentElement), col=function(v){ return (cs.getPropertyValue(v)||'').trim(); },
+    act=activePeople().filter(function(k){ return !isGenName(k); }), mf=monthFilter(), today=ymd(new Date()), td=parse(today), out=[];
+  for(var off=-1;off<=1;off++){ var f=ymd(new Date(td.getFullYear(),td.getMonth()+off,1)), dim=new Date(td.getFullYear(),td.getMonth()+off+1,0).getDate(), st=addDays(f,-weekday(f)), wk=Math.ceil((weekday(f)+dim)/7), days=[];
+    for(var i=0;i<wk*7;i++){ var d=addDays(st,i), sh=[], dt=[], bn=[];
+      act.forEach(function(k){ if(mf.indexOf(k)>-1){ var c=shiftOn(k,d); if(c.length) sh.push([c[0],col('--p-'+k)||'#888888']); } });
+      eventsOn(d).forEach(function(ev){ if(isAll(ev)||SHIFTCAT[ev.cat]) return; var va=evVis(ev); (ev.who||[]).forEach(function(k){ if(act.indexOf(k)>-1&&(va||mf.indexOf(k)>-1)&&dt.length<4) dt.push(col('--p-'+k)||'#888888'); }); });
+      binsOn(d).forEach(function(b){ bn.push(col('--bin-'+b.k)||'#666666'); });
+      var inf=dayInfo(d); days.push({d:d,sh:sh,dt:dt,bn:bn,h:inf.hol?1:0}); }
+    out.push({key:f.slice(0,7),days:days}); }
+  var js=JSON.stringify({sent:today,months:out}); if(js!==S.natMonths){ S.natMonths=js; window.FPNative.setMonths(js); } }catch(e){} }
+window.fpOpenDay=function(d){ try{ if(!S.events) return false; if(S.tab!=='cal'){ S.tab='cal'; renderTabs(); } S.view='month'; S.sel=d; renderCal(); openDay(); return true; }catch(e){ return false; } };
 setInterval(nativeSync,60000); setTimeout(nativeSync,6000);
 function wrapStore(st){ var w={}; Object.keys(st).forEach(function(k){ w[k]=st[k]; });
   ['set','update','remove'].forEach(function(m){ w[m]=function(c,id){ if(!(c==='settings'&&id==='pushplan')&&c!=='push'&&c!=='pushsrv'&&c!=='notes'&&c!=='shop'){ S.lastEdit=Date.now(); clearTimeout(pushT); pushT=setTimeout(pushSync,3000); } return st[m].apply(st,arguments); }; });
