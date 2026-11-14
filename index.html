@@ -1660,12 +1660,14 @@ function wxApplyBS(d,bs){ try{ var w=bs&&bs.weather, src=bs&&bs.sources&&bs.sour
   else if(d.c>=51&&d.c<=86){ d.c=3; d.pr=0; }
   else if(cond==='fog'&&d.c<=3) d.c=45;
   d.src='dwd'; d.st=String(src.station_name||'').slice(0,30); }catch(e){} }
+// Wolkenanteil (Station des DWD, sonst Vorhersage) bestimmt Sonne/Teils/Wolkig, damit das Bild zum Blick aus dem Fenster passt
+function wxCC(d,bs){ try{ if(d.c>3) return; var w=bs&&bs.weather, cc=(w&&w.cloud_cover!=null&&!isNaN(+w.cloud_cover))?+w.cloud_cover:d.cc; if(cc==null||isNaN(cc)) return; d.ccv=cc; d.c=cc<=25?0:(cc<=60?2:3); }catch(e){} }
 function wxLoad(force){ var c=null; try{ c=JSON.parse(localStorage.getItem('fp2_wx')||'null'); }catch(e){} if(c&&c.d&&!WX.d){ WX.d=c.d; wxRefresh(); }
   if(!navigator.onLine) return; var fresh=!force&&c&&c.t&&Date.now()-c.t<5*60000;
   wxPos().then(function(p){ if(fresh&&c.d&&c.d.pos&&wxKm(c.d.pos,p)<5) return; return wxName(p).then(function(name){
-    return fetch('https://api.open-meteo.com/v1/forecast?latitude='+p.lat.toFixed(3)+'&longitude='+p.lon.toFixed(3)+'&current=temperature_2m,weather_code,is_day,precipitation,rain,showers,snowfall&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5').then(function(r){ return r.json(); }).then(function(j){
-    if(!j||!j.current||!j.daily) return; var cu=j.current, pr=Math.max(+cu.precipitation||0,(+cu.rain||0)+(+cu.showers||0)), sn=+cu.snowfall||0, wc=cu.weather_code; if(wc<=3||wc===45||wc===48){ if(sn>=0.1) wc=71; else if(pr>=0.1) wc=pr>=4?65:(pr>=1?63:61); } var d={pr:pr,t:Math.round(j.current.temperature_2m),c:wc,day:j.current.is_day?1:0,place:name||'',pos:{lat:p.lat,lon:p.lon},days:(j.daily.time||[]).map(function(x,i){ return {d:x,c:j.daily.weather_code[i],max:Math.round(j.daily.temperature_2m_max[i]),min:Math.round(j.daily.temperature_2m_min[i])}; })};
-    return wxBS(p).then(function(bs){ wxApplyBS(d,bs); WX.d=d; try{ localStorage.setItem('fp2_wx',JSON.stringify({t:Date.now(),d:d})); if(!p.home) localStorage.setItem('fp2_wxpos',JSON.stringify({lat:p.lat,lon:p.lon,name:name||'',ts:Date.now()})); }catch(e){} wxRefresh(); }); }); }); }).catch(function(){}); }
+    return fetch('https://api.open-meteo.com/v1/forecast?latitude='+p.lat.toFixed(3)+'&longitude='+p.lon.toFixed(3)+'&current=temperature_2m,weather_code,is_day,precipitation,rain,showers,snowfall,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5').then(function(r){ return r.json(); }).then(function(j){
+    if(!j||!j.current||!j.daily) return; var cu=j.current, pr=Math.max(+cu.precipitation||0,(+cu.rain||0)+(+cu.showers||0)), sn=+cu.snowfall||0, wc=cu.weather_code; if(wc<=3||wc===45||wc===48){ if(sn>=0.1) wc=71; else if(pr>=0.1) wc=pr>=4?65:(pr>=1?63:61); } var d={pr:pr,cc:(cu.cloud_cover==null?null:+cu.cloud_cover),t:Math.round(j.current.temperature_2m),c:wc,day:j.current.is_day?1:0,place:name||'',pos:{lat:p.lat,lon:p.lon},days:(j.daily.time||[]).map(function(x,i){ return {d:x,c:j.daily.weather_code[i],max:Math.round(j.daily.temperature_2m_max[i]),min:Math.round(j.daily.temperature_2m_min[i])}; })};
+    return wxBS(p).then(function(bs){ wxApplyBS(d,bs); wxCC(d,bs); WX.d=d; try{ localStorage.setItem('fp2_wx',JSON.stringify({t:Date.now(),d:d})); if(!p.home) localStorage.setItem('fp2_wxpos',JSON.stringify({lat:p.lat,lon:p.lon,name:name||'',ts:Date.now()})); }catch(e){} wxRefresh(); }); }); }); }).catch(function(){}); }
 function wxRefresh(){ try{ renderAll(); }catch(e){} try{ WX.ps=[]; }catch(e){} wxLayer(); try{ ctGuard(); }catch(e){} }
 function wxChipHTML(){ var d=WX.d; if(!d) return ''; return '<button type="button" class="wxbtn" data-a="wxinfo" aria-expanded="'+!!S.wxOpen+'" aria-label="Wetter'+(d.place?' in '+esc(d.place):'')+': '+d.t+' Grad, Vorhersage zeigen"><span>'+wxIcon(d.c,d.day)+'</span> '+d.t+' °C</button>'; }
 function wxFcHTML(){ var d=WX.d; if(!d||!S.wxOpen) return ''; return '<div class="wxfc" role="group" aria-label="Wettervorhersage'+(d.place?' '+esc(d.place):'')+'">'+d.days.map(function(x){ var dt=new Date(x.d+'T12:00:00'); return '<span><b>'+esc(new Intl.DateTimeFormat('de-DE',{weekday:'short'}).format(dt))+'</b><i>'+wxIcon(x.c,1)+'</i>'+x.max+'°<small>'+x.min+'°</small></span>'; }).join('')+'</div>'; }
@@ -2683,7 +2685,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='13.11.2026 · 18:20';
+var APPVER='14.11.2026 · 10:39';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
