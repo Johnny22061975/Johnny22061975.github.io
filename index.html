@@ -1556,8 +1556,10 @@ function locToggle(on){ if(!S.me||isGenName(S.me)){ toast('Wähle zuerst unter M
   S.settingsRows=S.settingsRows||{};
   if(on){ var o={on:true,ts:Date.now()}; S.settingsRows['loc_'+S.me]=Object.assign({id:'loc_'+S.me},o); saveSettings('loc_'+S.me,o); locStart(); if(MAPV.me) locPublish(true); else mapStatus(); }
   else { var f={on:false,ts:Date.now()}; S.settingsRows['loc_'+S.me]=Object.assign({id:'loc_'+S.me},f); saveSettings('loc_'+S.me,f); if(S.tab!=='map') locStop(); }
-  mapShareUI(); mapFamUI(); mapDraw(); if(S.sheet==='settings'&&S.profOpen!==undefined) try{ renderSheet(); }catch(e){} }
-function locInit(){ if(locOn()) locStart(); else if(S.tab!=='map') locStop(); }
+  locNative(); mapShareUI(); mapFamUI(); mapDraw(); if(S.sheet==='settings'&&S.profOpen!==undefined) try{ renderSheet(); }catch(e){} }
+function locNative(){ try{ if(window.FPNative&&window.FPNative.setLocShare) window.FPNative.setLocShare(!!locOn()); }catch(e){} }
+window.fpNativeLoc=function(la,lo,ac){ MAPV.me={lat:+la,lon:+lo,acc:Math.round(+ac||0),ts:Date.now()}; MAPV.err=''; try{ if(S.tab==='map'){ mapDraw(); mapStatus(); } if(locOn()) locPublish(false); }catch(e){} };
+function locInit(){ if(locOn()) locStart(); else if(S.tab!=='map') locStop(); locNative(); }
 document.addEventListener('visibilitychange',function(){ if(document.hidden) return; if(locOn()||S.tab==='map'){ locStop(); locStart(); } });
 document.addEventListener('change',function(e){ var el=e.target; if(el&&el.dataset&&el.dataset.mapshare!==undefined){ e.stopImmediatePropagation(); locToggle(el.checked); } },true);
 function mapLib(){ if(window.L&&window.L.map) return Promise.resolve(); if(MAPV.lib) return MAPV.lib;
@@ -2688,7 +2690,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='15.11.2026 · 14:23';
+var APPVER='15.11.2026 · 15:58';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
