@@ -1583,11 +1583,12 @@ function mapIcon(k){ var n=String(pname(k)||'?').charAt(0).toUpperCase(); return
 function mapDraw(){ if(!MAPV.map||!window.L) return; var pts=[];
   mapPeople().forEach(function(k){ var r=locRow(k), show=k!==S.me&&r&&r.on&&r.lat!==undefined; if(!show){ if(MAPV.mk[k]){ MAPV.map.removeLayer(MAPV.mk[k]); delete MAPV.mk[k]; } return; }
     var ll=[r.lat,r.lon]; pts.push(ll); if(MAPV.mk[k]) MAPV.mk[k].setLatLng(ll); else MAPV.mk[k]=L.marker(ll,{icon:mapIcon(k)}).addTo(MAPV.map);
-    MAPV.mk[k].bindPopup('<b>'+esc(pname(k))+'</b><br>'+esc(locAgo(r.ts))+'<br><a href="'+mapRoute(r.lat,r.lon)+'" target="_blank" rel="noopener">🧭 Route</a>'); });
+    var ph='<b>'+esc(pname(k))+'</b><br>'+esc(locAgo(r.ts))+'<br><a href="'+mapRoute(r.lat,r.lon)+'" target="_blank" rel="noopener">🧭 Route</a>'; MAPV.ph=MAPV.ph||{};
+    if(MAPV.ph[k]!==ph){ MAPV.ph[k]=ph; var pp=MAPV.mk[k].getPopup(); if(pp){ if(!MAPV.map.hasLayer(pp)||!pp.isOpen||!pp.isOpen()) pp.setContent(ph); else { var ce=pp.getElement&&pp.getElement(); var cc=ce&&ce.querySelector('.leaflet-popup-content'); if(cc) cc.innerHTML=ph; } } else MAPV.mk[k].bindPopup(ph,{autoPan:false}); } });
   if(MAPV.me){ var ll2=[MAPV.me.lat,MAPV.me.lon], mk=S.me&&!isGenName(S.me)?S.me:'', col=mk?mapCol(mk):'#2f6fdc'; pts.push(ll2);
     if(MAPV.meMk){ MAPV.meMk.setLatLng(ll2); MAPV.acc.setLatLng(ll2).setRadius(Math.max(8,MAPV.me.acc)); if(MAPV.acc.setStyle) MAPV.acc.setStyle({color:col}); }
     else { MAPV.acc=L.circle(ll2,{radius:Math.max(8,MAPV.me.acc),color:col,weight:1,fillOpacity:.12,interactive:false}).addTo(MAPV.map); MAPV.meMk=L.marker(ll2,{icon:mk?mapIcon(mk):L.divIcon({className:'mpin',html:'<span style="--pc:#2f6fdc">★</span>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:1000}).addTo(MAPV.map); }
-    MAPV.meMk.bindPopup('<b>Du'+(mk?' ('+esc(pname(mk))+')':'')+'</b><br>Hier bist du.'); }
+    if(!MAPV.meMk.getPopup()) MAPV.meMk.bindPopup('<b>Du'+(mk?' ('+esc(pname(mk))+')':'')+'</b><br>Hier bist du.',{autoPan:false}); }
   else if(MAPV.meMk){ MAPV.map.removeLayer(MAPV.meMk); MAPV.map.removeLayer(MAPV.acc); MAPV.meMk=null; MAPV.acc=null; }
   if(!MAPV.fitted&&pts.length){ MAPV.fitted=true; if(pts.length===1) MAPV.map.setView(pts[0],16); else MAPV.map.fitBounds(pts,{padding:[40,40],maxZoom:16}); } }
 function mapStopsUI(){ var el=$('#mapStops'); if(el){ if(!MAPV.stops) el.innerHTML=''; else el.innerHTML='<div class="fld"><span class="lbl">Haltestellen in der Nähe</span>'+(MAPV.stops.length?MAPV.stops.map(function(s){ var on=MAPV.sel&&MAPV.sel.id===s.id; return '<button type="button" class="krow mstop" data-a="mapstop" data-id="'+esc(s.id)+'" data-n="'+esc(s.name)+'" data-la="'+s.lat+'" data-lo="'+s.lon+'" aria-pressed="'+!!on+'"><span>🚏</span><span><b>'+esc(s.name)+'</b><small>'+(on?'Abfahrten stehen unter der Karte':'Tippen für Abfahrten')+'</small></span><b>'+s.d+' m</b></button>'; }).join(''):'<p class="hint">Keine Haltestelle im Umkreis gefunden.</p>')+'</div>'; }
@@ -1607,7 +1608,7 @@ function mapDeps(id,name,lat,lon){ if(!id) return; if(MAPV.sel&&MAPV.sel.id===id
   MAPV.sel={id:id,name:name,lat:+lat||0,lon:+lon||0}; MAPV.deps=null; mapStopsUI(); var cv=$('#mapCanvas'); if(cv&&cv.scrollIntoView) try{ cv.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){}
   ftPost({rmv:id,line:'',dur:60}).then(function(r){ if(!MAPV.sel||MAPV.sel.id!==id) return; if(r.err||r.v!==4) throw new Error(r.err||'v'); MAPV.deps={list:(r.deps||[]).slice(0,14)}; mapStopsUI(); }).catch(function(e){ if(!MAPV.sel||MAPV.sel.id!==id) return; MAPV.deps={err:'Die Abfahrten konnten nicht geladen werden ('+String((e&&e.message)||e).slice(0,40)+').'}; mapStopsUI(); }); }
 function mapFocus(k){ if(!MAPV.map) return; var ll=k===S.me?(MAPV.me&&[MAPV.me.lat,MAPV.me.lon]):(locRow(k)&&locRow(k).lat!==undefined&&[locRow(k).lat,locRow(k).lon]); if(!ll) return; MAPV.map.setView(ll,16); var el=$('#mapCanvas'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'}); var mk=k===S.me?MAPV.meMk:MAPV.mk[k]; if(mk&&mk.openPopup) mk.openPopup(); }
-function mapMe(){ if(MAPV.me&&MAPV.map){ MAPV.map.setView([MAPV.me.lat,MAPV.me.lon],16); return; } MAPV.err=''; locStart(); MAPV.busy='Position wird gesucht …'; mapStatus(); setTimeout(function(){ MAPV.busy=''; mapStatus(); },8000); }
+function mapMe(){ if(MAPV.me&&MAPV.map){ try{ MAPV.map.closePopup(); }catch(e){} MAPV.map.setView([MAPV.me.lat,MAPV.me.lon],16); return; } MAPV.err=''; locStart(); MAPV.busy='Position wird gesucht …'; mapStatus(); setTimeout(function(){ MAPV.busy=''; mapStatus(); },8000); }
 function goMin(m){ return m>=60?Math.floor(m/60)+' Std '+(m%60?m%60+' Min':''):m+' Min'; }
 function goBoard(t){ var w=0,b=null; for(var i=0;i<t.legs.length;i++){ var g=t.legs[i]; if(g.w){ w+=g.d; continue; } b=g; break; } return b?{leg:b,walk:w}:null; }
 function goErr(c){ c=String(c||''); if(c==='keinziel'||/NO_MATCH/.test(c)) return 'Dieses Ziel habe ich nicht gefunden. Versuch es mit Ort und Straße oder dem Namen der Haltestelle.'; if(c==='nokey') return 'Im Cloudflare-Helfer fehlt der RMV-Schlüssel.'; if(c==='kurz') return 'Bitte ein Ziel mit mindestens 3 Buchstaben eingeben.';
@@ -2687,7 +2688,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='14.11.2026 · 22:08';
+var APPVER='15.11.2026 · 14:23';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
