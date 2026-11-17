@@ -17,11 +17,16 @@ try {
   const APPCHECK_KEY = window.FP_APPCHECK_KEY || '6LfwKBIuAAAAAGWmdQq4aSyzF33HiEIJ2AYZk0SU'; // Fraud Defense (reCAPTCHA Enterprise), Projekt familien-planner
   const APPCHECK_TYPE = window.FP_APPCHECK_TYPE || 'enterprise'; // 'enterprise' (Fraud Defense) oder 'v3'
   // In der Android-App antwortet reCAPTCHA nicht und blockiert jede KI-Anfrage: dort ohne App Check.
+  // Lösung: Die Android-App liefert einen bei Firebase hinterlegten Debug-Token (GitHub-Secret FP_AC_DEBUG).
   const NATIVE = !!window.FPNative;
-  let acReady = null, acInfo = NATIVE ? 'in der Android-App aus' : APPCHECK_KEY ? 'startet' : 'aus';
+  let AC_DBG = '';
+  try { AC_DBG = (NATIVE && window.FPNative.acDebug) ? String(window.FPNative.acDebug() || '') : ''; } catch (e) {}
+  if (AC_DBG) self.FIREBASE_APPCHECK_DEBUG_TOKEN = AC_DBG;
+  const AC_ON = APPCHECK_KEY && (!NATIVE || AC_DBG);
+  let acReady = null, acInfo = !AC_ON ? (NATIVE ? 'in der Android-App ohne Token (alte App oder Secret FP_AC_DEBUG fehlt)' : 'aus') : AC_DBG ? 'startet (Android-Token)' : 'startet';
   let aiStep = 'noch nicht gestartet';
   window.FP_AISTEP = () => aiStep + ' · Prüfung: ' + acInfo;
-  if (APPCHECK_KEY && !NATIVE) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
+  if (AC_ON) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
     provider: APPCHECK_TYPE === 'enterprise' ? new AC.ReCaptchaEnterpriseProvider(APPCHECK_KEY) : new AC.ReCaptchaV3Provider(APPCHECK_KEY),
     isTokenAutoRefreshEnabled: true
   })).then(ac => import(B + 'firebase-app-check.js').then(AC => AC.getToken(ac)).then(() => { acInfo = 'ok'; return ac; }, e => { acInfo = 'Token-Fehler: ' + String((e && e.message) || e).slice(0, 140); return ac; }))
@@ -52,7 +57,7 @@ try {
   const MODELS = [window.FP_MODEL, (() => { try { return localStorage.getItem('fp2_aimodel'); } catch (e) { return null; } })(), 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-flash-latest'].filter((x, i, a) => x && a.indexOf(x) === i);
   let aiM = null, ai = null; const models = {};
   async function getModel(name){
-    if (!aiM) { aiStep = 'wartet auf Prüfung'; if (acReady) await Promise.race([acReady, new Promise(res => setTimeout(() => { if (acInfo === 'startet') acInfo = 'Zeitüberschreitung (reCAPTCHA antwortet nicht)'; res(null); }, 8000))]); aiStep = 'lädt KI-Modul'; aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
+    if (!aiM) { aiStep = 'wartet auf Prüfung'; if (acReady) await Promise.race([acReady, new Promise(res => setTimeout(() => { if (/^startet/.test(acInfo)) acInfo = 'Zeitüberschreitung (reCAPTCHA antwortet nicht)'; res(null); }, 8000))]); aiStep = 'lädt KI-Modul'; aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
     return models[name] || (models[name] = aiM.getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } }));
   }
   const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
@@ -69,7 +74,7 @@ try {
         catch (e) {
           const s = String((e && e.message) || e); last = s;
           if (/\b404\b|\b50[0-4]\b|not found|not supported|is not available|no longer|retired|deprecated|high demand|overloaded|UNAVAILABLE|try again later/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
-          if (/app ?check/i.test(s)) throw { code: 'failed', message: 'App Check (' + (NATIVE ? 'Android' : APPCHECK_TYPE) + ', ' + acInfo + '): ' + name + ': ' + s.slice(-120) };
+          if (/app ?check/i.test(s)) throw { code: 'failed', message: 'App Check (' + (NATIVE ? (AC_DBG ? 'Android-Token' : 'Android') : APPCHECK_TYPE) + ', ' + acInfo + '): ' + name + ': ' + s.slice(-120) };
           throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: name + ': ' + s.slice(-160) };
         }
       }
