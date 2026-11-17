@@ -1564,7 +1564,9 @@ function locToggle(on){ if(!S.me||isGenName(S.me)){ toast('Wähle zuerst unter M
   if(on){ var o={on:true,ts:Date.now()}; S.settingsRows['loc_'+S.me]=Object.assign({id:'loc_'+S.me},o); saveSettings('loc_'+S.me,o); locStart(); if(MAPV.me) locPublish(true); else mapStatus(); }
   else { var f={on:false,ts:Date.now()}; S.settingsRows['loc_'+S.me]=Object.assign({id:'loc_'+S.me},f); saveSettings('loc_'+S.me,f); if(S.tab!=='map') locStop(); }
   locNative(); mapShareUI(); mapFamUI(); mapDraw(); if(S.sheet==='settings'&&S.profOpen!==undefined) try{ renderSheet(); }catch(e){} }
-function locNative(){ try{ if(window.FPNative&&window.FPNative.setLocShare) window.FPNative.setLocShare(!!locOn()); }catch(e){} }
+function locNative(){ try{ if(!window.FPNative) return; var on=!!locOn();
+  if(window.FPNative.setLocAuth){ var au=on&&window.FP_LOCAUTH&&window.FP_LOCAUTH(); if(au&&au.refreshToken&&S.me) window.FPNative.setLocAuth(JSON.stringify(Object.assign(au,{me:S.me}))); else if(!on&&S.settingsRows&&locRow(S.me)) window.FPNative.setLocAuth(''); }
+  if(window.FPNative.setLocShare) window.FPNative.setLocShare(on); }catch(e){} }
 window.fpNativeLoc=function(la,lo,ac){ MAPV.me={lat:+la,lon:+lo,acc:Math.round(+ac||0),ts:Date.now()}; MAPV.err=''; try{ if(S.tab==='map'){ mapDraw(); mapStatus(); } if(locOn()) locPublish(false); }catch(e){} };
 function locInit(){ if(locOn()) locStart(); else if(S.tab!=='map') locStop(); locNative(); }
 document.addEventListener('visibilitychange',function(){ if(document.hidden) return; if(locOn()||S.tab==='map'){ locStop(); locStart(); } });
@@ -1578,7 +1580,7 @@ function mapSkeleton(){ return '<p class="hint" id="mapShareNote" style="margin:
   +'<div class="mgo"><input id="mapGoQ" type="text" enterkeyhint="search" placeholder="Wohin? z. B. Frankfurt Hauptbahnhof" autocomplete="off" aria-label="Ziel"><details class="mgow"'+(MAPV.goD||MAPV.goT?' open':'')+'><summary>🕒 Abfahrt: '+goWhenTxt()+'</summary><div class="fld"><span class="lbl">Datum</span>'+dateSelects('go:date',MAPV.goD||isoDay(new Date()))+'</div><div class="fld"><span class="lbl">Uhrzeit</span>'+timeSelects('go:time',MAPV.goT||'')+'</div><p class="hint">Ohne Uhrzeit gilt „jetzt“.</p><button type="button" class="btn sm" data-a="goreset">Zurück auf jetzt</button></details><div class="mgo2"><button type="button" class="btn sm pri grow" data-a="gosearch">🔎 Verbindung suchen</button></div></div>'
   +'<p class="hint" id="mapStatus" role="status"></p><div id="mapCanvas" aria-label="Karte"></div><div id="mapDeps"></div><div id="mapTrip"></div>'
   +'<div class="btns"><button type="button" class="btn sm" data-a="mapme">📍 Wo bin ich?</button><button type="button" class="btn sm pri" data-a="mapnear">🚏 Haltestellen in der Nähe</button></div>'
-  +'<div id="mapFam"></div><div id="mapStops"></div><p class="hint">Karte: © OpenStreetMap-Mitwirkende. Der Standort wird nur gemeldet, solange die App offen ist.</p>'; }
+  +'<div id="mapFam"></div><div id="mapStops"></div><p class="hint">Karte: © OpenStreetMap-Mitwirkende. Mit der Android-App wird der Standort auch bei geschlossener App gemeldet, solange „Auf der Karte sichtbar“ an ist.</p>'; }
 function mapShareUI(){ document.querySelectorAll('[data-mapshare]').forEach(function(cb){ cb.checked=locOn(); }); var n=$('#mapShareNote'); if(n) n.textContent=!S.me||isGenName(S.me)?'Wähle zuerst unter Menü → Familie, wer du bist.':locOn()?'Du bist für die Familie sichtbar. Ausschalten: Menü → Familie → „Ich bin“.':'Du bist unsichtbar. Einschalten: Menü → Familie → „Ich bin“ → Auf der Karte sichtbar.'; }
 function mapCol(k){ var c=''; try{ c=getComputedStyle(document.documentElement).getPropertyValue('--p-'+k).trim(); }catch(e){} return /^#[0-9a-fA-F]{3,8}$/.test(c)?c:'#2f6fdc'; }
 function mapRoute(lat,lon){ return 'https://www.google.com/maps/dir/?api=1&destination='+lat+','+lon+'&travelmode=walking'; }
@@ -2706,7 +2708,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='17.11.2026 · 12:06';
+var APPVER='17.11.2026 · 12:11';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 

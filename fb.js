@@ -127,6 +127,8 @@ try {
       else emit({ state: 'error', msg: errText(e) });
     }
   };
+  // Für den Standort-Dienst der Android-App: damit er auch bei geschlossener App senden darf
+  window.FP_LOCAUTH = () => { const u = auth.currentUser, c = window.FP_CONFIG || {}; return u ? { apiKey: c.apiKey, projectId: c.projectId, appId: c.appId, refreshToken: u.refreshToken, uid: u.uid } : null; };
   window.FP_signOut = () => AU.signOut(auth).then(() => location.reload());
   AU.getRedirectResult(auth).catch(e => emit({ state: 'error', msg: errText(e) }));
   AU.onAuthStateChanged(auth, u => {
