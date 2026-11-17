@@ -48,7 +48,7 @@ try {
   const MODELS = [window.FP_MODEL, (() => { try { return localStorage.getItem('fp2_aimodel'); } catch (e) { return null; } })(), 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-flash-latest'].filter((x, i, a) => x && a.indexOf(x) === i);
   let aiM = null, ai = null; const models = {};
   async function getModel(name){
-    if (!aiM) { if (acReady) await acReady; aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
+    if (!aiM) { if (acReady) await Promise.race([acReady, new Promise(res => setTimeout(() => { if (acInfo === 'startet') acInfo = 'Zeitüberschreitung (reCAPTCHA antwortet nicht)'; res(null); }, 8000))]); aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
     return models[name] || (models[name] = aiM.getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } }));
   }
   const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
