@@ -2706,7 +2706,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='17.11.2026 · 11:58';
+var APPVER='17.11.2026 · 12:06';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2799,7 +2799,7 @@ function kasseHTML(){ var L=kVis(setList('kasse')), ym=S.kYm||ymd(new Date()).sl
       :'<p class="hint">In diesem Monat noch keine Ausgaben. Tipp auf „+ Ausgabe“ oder fotografiere einen Kassenbon.</p>'); }
 function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
   var fail=function(m){ if(S.kScan!==sc) return; sc.busy=false; sc.err=true; sc.msg=m; hhRender();
-    if(window.FP_AIPING&&!sc.pinged){ sc.pinged=true; sc.msg+=' Prüfe die KI ohne Foto …'; hhRender(); window.FP_AIPING().then(function(t){ if(S.kScan!==sc) return; sc.msg=m+' '+t; hhRender(); }); } };
+    if(window.FP_AIPING&&!sc.pinged&&/dauert zu lange/.test(m)){ sc.pinged=true; sc.msg+=' Prüfe die KI ohne Foto …'; hhRender(); window.FP_AIPING().then(function(t){ if(S.kScan!==sc) return; sc.msg=m+' '+t; hhRender(); }); } };
   if(!(S.sample&&typeof S.sample.json==='function')) return fail('Das Auslesen geht nur in der angemeldeten App.');
   var fr=new FileReader(); fr.onerror=function(){ fail('Das Foto konnte nicht gelesen werden.'); };
   fr.onload=function(){ var im=new Image(); im.onerror=function(){ fail('Das ist kein lesbares Bild.'); }; im.onload=function(){ var k=Math.min(1,1600/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height);
@@ -2808,7 +2808,7 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
         +'Bereiche (Schlüssel = Name): '+KCAT.map(function(c){ return c[0]+' = '+c[2]; }).join(', ')+'.\n'
         +'Antworte NUR mit JSON: {"shop":"Name des Geschäfts, kurz","date":"JJJJ-MM-TT","total":"Gesamtbetrag (zu zahlen) als Zahl mit Punkt, z. B. 23.45","cat":"passender Bereich-Schlüssel","items":[{"n":"Artikel kurz","p":"Preis als Zahl","q":"Menge mit Einheit, wenn auf dem Bon zu lesen, z. B. 0,312 kg, 2 Stück, 500 g, 6x1,5 l; sonst leer lassen","r":"Mehrwertsteuersatz des Artikels in Prozent: 7 oder 19 (oder 0); ergibt sich meist aus dem Buchstaben hinter dem Preis (z. B. A/B, 1/2) und der Steuer-Legende unten auf dem Bon"}],"vat":[{"r":"Steuersatz 7 oder 19","g":"Bruttobetrag dieses Satzes","t":"enthaltene MwSt"}],"note":"kurzer Hinweis, falls etwas unleserlich war, sonst leer"}\n'
         +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Restaurants, Fast Food und Lieferdienste gehören zum Bereich essen, Zigaretten und Tabak zum Bereich tabak, Benzin, Diesel, Öl und Autozubehör zum Bereich tanken. Erfinde nichts.';
-      var tmo=setTimeout(function(){ var st=''; try{ if(window.FP_AISTEP) st=' Hängt bei: '+window.FP_AISTEP()+'.'; }catch(x){} fail('Das Auslesen dauert zu lange (über 60 Sekunden).'+st); },60000);
+      var tmo=setTimeout(function(){ var st=''; try{ if(window.FP_AISTEP) st=' Hängt bei: '+window.FP_AISTEP()+'.'; }catch(x){} fail('Das Auslesen dauert zu lange (über 100 Sekunden).'+st); },100000);
       S.sample.json(prompt,{images:[blob],modelTier:'default',cache:false}).then(function(r){ clearTimeout(tmo); if(S.kScan!==sc) return; sc.busy=false; var f=S.kf; if(!f) return;
         var t=cents(String((r&&r.total)||'').replace('.',',')); if(!(t>0)){ sc.err=true; sc.msg='Ich konnte keinen Gesamtbetrag erkennen. Versuch ein schärferes Foto oder trag den Betrag selbst ein.'; hhRender(); return; }
         f.amt=(t/100).toFixed(2).replace('.',','); if(r.shop) f.shop=String(r.shop).slice(0,40); if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')) f.date=r.date; if(kcat(r.cat)[0]===r.cat) f.cat=r.cat; if(kFast(f.shop)) f.cat='essen';
@@ -2816,7 +2816,7 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
         f.items=((r&&Array.isArray(r.items))?r.items:[]).slice(0,60).map(function(i){ var o={n:String((i&&i.n)||'').slice(0,40),c:cents(String((i&&i.p)||'').replace('.',','))}, rr=rate(i&&i.r), qq=String((i&&i.q)||'').replace(/\s+/g,' ').trim().slice(0,16); if(rr!==null) o.r=rr; if(qq&&!/^(null|-|0)$/i.test(qq)) o.q=qq; return o; }).filter(function(i){ return i.n&&isFinite(i.c); });
         f.vat=((r&&Array.isArray(r.vat))?r.vat:[]).slice(0,4).map(function(v){ return {r:rate(v&&v.r),g:cents(String((v&&v.g)||'').replace('.',',')),t:cents(String((v&&v.t)||'').replace('.',','))}; }).filter(function(v){ return v.r!==null&&isFinite(v.g)&&isFinite(v.t); });
         sc.err=false; sc.msg=(r.note&&String(r.note).trim())?String(r.note).trim().slice(0,160):'Bon erkannt. Bitte kurz prüfen und speichern.'; hhRender();
-      },function(e){ clearTimeout(tmo); var st=''; try{ if(window.FP_AISTEP) st=' Schritt: '+window.FP_AISTEP()+'.'; }catch(x){} fail('Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(-200)+').'+st); }); },'image/jpeg',0.85); }; im.src=fr.result; };
+      },function(e){ clearTimeout(tmo); var st=''; try{ if(window.FP_AISTEP) st=' Schritt: '+window.FP_AISTEP()+'.'; }catch(x){} if(e&&e.code==='rate_limited'){ fail(String(e.message)+'.'); return; } fail('Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(-200)+').'+st); }); },'image/jpeg',0.85); }; im.src=fr.result; };
   fr.readAsDataURL(file); }
 
 // ---------- Vorräte ----------
