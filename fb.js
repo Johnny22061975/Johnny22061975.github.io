@@ -16,8 +16,12 @@ try {
   // Der reCAPTCHA-Websiteschlüssel ist öffentlich und darf hier stehen.
   const APPCHECK_KEY = window.FP_APPCHECK_KEY || '6LfwKBIuAAAAAGWmdQq4aSyzF33HiEIJ2AYZk0SU'; // Fraud Defense (reCAPTCHA Enterprise), Projekt familien-planner
   const APPCHECK_TYPE = window.FP_APPCHECK_TYPE || 'enterprise'; // 'enterprise' (Fraud Defense) oder 'v3'
-  let acReady = null, acInfo = APPCHECK_KEY ? 'startet' : 'aus';
-  if (APPCHECK_KEY) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
+  // In der Android-App antwortet reCAPTCHA nicht und blockiert jede KI-Anfrage: dort ohne App Check.
+  const NATIVE = !!window.FPNative;
+  let acReady = null, acInfo = NATIVE ? 'in der Android-App aus' : APPCHECK_KEY ? 'startet' : 'aus';
+  let aiStep = 'noch nicht gestartet';
+  window.FP_AISTEP = () => aiStep + ' · Prüfung: ' + acInfo;
+  if (APPCHECK_KEY && !NATIVE) acReady = import(B + 'firebase-app-check.js').then(AC => AC.initializeAppCheck(app, {
     provider: APPCHECK_TYPE === 'enterprise' ? new AC.ReCaptchaEnterpriseProvider(APPCHECK_KEY) : new AC.ReCaptchaV3Provider(APPCHECK_KEY),
     isTokenAutoRefreshEnabled: true
   })).then(ac => import(B + 'firebase-app-check.js').then(AC => AC.getToken(ac)).then(() => { acInfo = 'ok'; return ac; }, e => { acInfo = 'Token-Fehler: ' + String((e && e.message) || e).slice(0, 140); return ac; }))
@@ -48,23 +52,24 @@ try {
   const MODELS = [window.FP_MODEL, (() => { try { return localStorage.getItem('fp2_aimodel'); } catch (e) { return null; } })(), 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-flash-latest'].filter((x, i, a) => x && a.indexOf(x) === i);
   let aiM = null, ai = null; const models = {};
   async function getModel(name){
-    if (!aiM) { if (acReady) await Promise.race([acReady, new Promise(res => setTimeout(() => { if (acInfo === 'startet') acInfo = 'Zeitüberschreitung (reCAPTCHA antwortet nicht)'; res(null); }, 8000))]); aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
+    if (!aiM) { aiStep = 'wartet auf Prüfung'; if (acReady) await Promise.race([acReady, new Promise(res => setTimeout(() => { if (acInfo === 'startet') acInfo = 'Zeitüberschreitung (reCAPTCHA antwortet nicht)'; res(null); }, 8000))]); aiStep = 'lädt KI-Modul'; aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
     return models[name] || (models[name] = aiM.getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } }));
   }
   const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
   const sample = {
     limits: () => Promise.resolve({ images: true }),
     json: async (prompt, opt) => {
-      if (!navigator.onLine) throw { code: 'offline' };
+      aiStep = 'startet'; if (!navigator.onLine) throw { code: 'offline' };
+      aiStep = 'wandelt Foto um';
       const parts = [{ text: prompt }];
       for (const bl of ((opt && opt.images) || [])) parts.push({ inlineData: { data: await b64(bl), mimeType: bl.type || 'image/jpeg' } });
       let r = null, last = '';
       for (const name of MODELS) {
-        try { r = await (await getModel(name)).generateContent(parts); try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break; }
+        try { const m = await getModel(name); aiStep = 'wartet auf KI-Antwort (' + name + ')'; r = await m.generateContent(parts); aiStep = 'Antwort da'; try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break; }
         catch (e) {
           const s = String((e && e.message) || e); last = s;
           if (/\b404\b|\b50[0-4]\b|not found|not supported|is not available|no longer|retired|deprecated|high demand|overloaded|UNAVAILABLE|try again later/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
-          if (/app ?check/i.test(s)) throw { code: 'failed', message: 'App Check (' + APPCHECK_TYPE + ', ' + acInfo + '): ' + name + ': ' + s.slice(-120) };
+          if (/app ?check/i.test(s)) throw { code: 'failed', message: 'App Check (' + (NATIVE ? 'Android' : APPCHECK_TYPE) + ', ' + acInfo + '): ' + name + ': ' + s.slice(-120) };
           throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(s) ? 'rate_limited' : /not been used|disabled|not enabled|PERMISSION_DENIED|403/i.test(s) ? 'ai_disabled' : 'failed', message: name + ': ' + s.slice(-160) };
         }
       }
