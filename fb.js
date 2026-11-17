@@ -67,10 +67,11 @@ try {
       aiStep = 'startet'; if (!navigator.onLine) throw { code: 'offline' };
       aiStep = 'wandelt Foto um';
       const parts = [{ text: prompt }];
-      for (const bl of ((opt && opt.images) || [])) parts.push({ inlineData: { data: await b64(bl), mimeType: bl.type || 'image/jpeg' } });
+      let kb = 0;
+      for (const bl of ((opt && opt.images) || [])) { const d = await b64(bl); kb += Math.round(d.length * 0.75 / 1024); parts.push({ inlineData: { data: d, mimeType: bl.type || 'image/jpeg' } }); }
       let r = null, last = '';
       for (const name of MODELS) {
-        try { const m = await getModel(name); aiStep = 'wartet auf KI-Antwort (' + name + ')'; r = await Promise.race([m.generateContent(parts), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout ' + name + ' (keine Antwort in 25 s)')), 25000))]); aiStep = 'Antwort da'; try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break; }
+        try { const m = await getModel(name); aiStep = 'wartet auf KI-Antwort (' + name + (kb ? ', Foto ' + kb + ' KB' : '') + ')'; r = await Promise.race([m.generateContent(parts), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout ' + name + ' (keine Antwort in 25 s)')), 25000))]); aiStep = 'Antwort da'; try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break; }
         catch (e) {
           const s = String((e && e.message) || e); last = s;
           if (/timeout|\b404\b|\b50[0-4]\b|not found|not supported|is not available|no longer|retired|deprecated|high demand|overloaded|UNAVAILABLE|try again later/i.test(s)) continue; // Modell gibt es nicht (mehr): nächstes probieren
@@ -82,6 +83,16 @@ try {
       let t = r.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
       try { return JSON.parse(t); } catch (e) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a > -1 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (x) {} } throw { code: 'invalid_json', message: t.slice(0, 120) }; }
     }
+  };
+  // Test ohne Foto: zeigt, ob die KI in dieser Umgebung überhaupt antwortet
+  window.FP_AIPING = async () => {
+    const name = (() => { try { return localStorage.getItem('fp2_aimodel'); } catch (e) { return null; } })() || 'gemini-2.5-flash';
+    const t0 = Date.now(), sec = () => ((Date.now() - t0) / 1000).toFixed(1) + ' s';
+    try {
+      const m = await getModel(name);
+      const r = await Promise.race([m.generateContent([{ text: 'Antworte nur mit {"ok":1}' }]), new Promise((_, rej) => setTimeout(() => rej(new Error('keine Antwort in 20 s')), 20000))]);
+      return 'Text-Test (' + name + '): ok in ' + sec() + ', Antwort ' + String(r.response.text()).slice(0, 20);
+    } catch (e) { return 'Text-Test (' + name + '): Fehler nach ' + sec() + ': ' + String((e && e.message) || e).slice(-120); }
   };
   // Benachrichtigungen: Gerät bei Firebase Cloud Messaging anmelden
   window.FP_PUSH = {

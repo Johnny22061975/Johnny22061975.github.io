@@ -2707,7 +2707,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='17.11.2026 · 10:38';
+var APPVER='17.11.2026 · 11:47';
 
 // ---------- Schichtfarben (jede Person für sich) ----------
 var SHC_DEF={F:'#f2c230',S:'#f08a24',N:'#2c3e8f',TD:'#3aa66b'}, SHC_L={F:'Früh',S:'Spät',N:'Nacht',TD:'Tagdienst'};
@@ -2797,7 +2797,8 @@ function kasseHTML(){ var L=kVis(setList('kasse')), ym=S.kYm||ymd(new Date()).sl
       +'<div class="fld"><span class="lbl">Einträge</span>'+M.map(function(x){ var c=kcat(x.cat); return '<button type="button" class="krow" data-a="kedit" data-id="'+esc(x.id)+'"><span>'+c[1]+'</span><span><b>'+esc(x.shop||c[2])+'</b><small>'+esc(WD[weekday(x.d)]+', '+dmy(x.d)+(x.by&&PEOPLE.indexOf(x.by)>-1?' · '+pname(x.by):'')+(x.note?' · '+x.note:''))+'</small></span><b>'+eur(x.c)+'</b></button>'; }).join('')+'</div>'
       :'<p class="hint">In diesem Monat noch keine Ausgaben. Tipp auf „+ Ausgabe“ oder fotografiere einen Kassenbon.</p>'); }
 function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
-  var fail=function(m){ if(S.kScan!==sc) return; sc.busy=false; sc.err=true; sc.msg=m; hhRender(); };
+  var fail=function(m){ if(S.kScan!==sc) return; sc.busy=false; sc.err=true; sc.msg=m; hhRender();
+    if(window.FP_AIPING&&!sc.pinged){ sc.pinged=true; sc.msg+=' Prüfe die KI ohne Foto …'; hhRender(); window.FP_AIPING().then(function(t){ if(S.kScan!==sc) return; sc.msg=m+' '+t; hhRender(); }); } };
   if(!(S.sample&&typeof S.sample.json==='function')) return fail('Das Auslesen geht nur in der angemeldeten App.');
   var fr=new FileReader(); fr.onerror=function(){ fail('Das Foto konnte nicht gelesen werden.'); };
   fr.onload=function(){ var im=new Image(); im.onerror=function(){ fail('Das ist kein lesbares Bild.'); }; im.onload=function(){ var k=Math.min(1,1600/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height);
