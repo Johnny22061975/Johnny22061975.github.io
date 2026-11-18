@@ -119,6 +119,20 @@ try {
     },
     async off() { try { const M = await import(B + 'firebase-messaging.js'); await M.deleteToken(M.getMessaging(app)); } catch (e) {} }
   };
+  // Android-App: echte Android-Benachrichtigungen statt Browser-Push (der in der App nicht geht)
+  if (NATIVE && window.FPNative.pushStart) {
+    window.FP_PUSH = {
+      native: true,
+      ok: () => true,
+      perm: () => { try { return String(window.FPNative.notifPerm()); } catch (e) { return 'default'; } },
+      token: (vapid, ask) => new Promise((res, rej) => {
+        const to = setTimeout(() => rej({ code: 'token', message: 'Das Handy hat keine Kennung geliefert' }), 25000);
+        window.fpNativePush = (tk, perm) => { clearTimeout(to); if (tk) res(tk); else rej({ code: perm === 'denied' ? 'denied' : 'noperm' }); };
+        window.FPNative.pushStart(!!ask);
+      }),
+      async off() { try { window.FPNative.pushOff(); } catch (e) {} }
+    };
+  }
   window.FP_signIn = async () => {
     const p = new AU.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
     try { await AU.signInWithPopup(auth, p); }
