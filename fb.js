@@ -55,8 +55,11 @@ try {
   // KI-Auswertung (Fotos, Sätze) über Gemini / Firebase AI Logic
   // Immer zuerst das beste Modell. Weiter zum nächsten nur, wenn es das Modell nicht gibt
   // oder sein Tageslimit (kostenloser Tarif) voll ist. Bei langsamer Antwort NICHT weiter (jede Anfrage zählt).
-  const MODELS = [window.FP_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.8-flash-lite', 'gemini-flash-lite-latest'].filter((x, i, a) => x && a.indexOf(x) === i);
-  const AI_WAIT = 80000;
+  // Ist das beste Modell zu langsam, geht es direkt zu einem schnellen Lite-Modell.
+  // gemini-2.5-flash gibt es nicht mehr: wird übersprungen, auch wenn es noch in config.js steht.
+  const MODELS = [window.FP_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-3.8-flash-lite'].filter((x, i, a) => x && !/2\.5/.test(x) && a.indexOf(x) === i);
+  const isLite = n => /lite/.test(n);
+  const AI_WAIT = 45000, AI_WAIT_LITE = 40000;
   let aiM = null, ai = null; const models = {};
   async function getModel(name){
     if (!aiM) { aiStep = 'wartet auf Prüfung'; if (acReady) await Promise.race([acReady, new Promise(res => setTimeout(() => { if (/^startet/.test(acInfo)) acInfo = 'Zeitüberschreitung (reCAPTCHA antwortet nicht)'; res(null); }, 8000))]); aiStep = 'lädt KI-Modul'; aiM = await import(B + 'firebase-ai.js'); ai = aiM.getAI(app, { backend: new aiM.GoogleAIBackend() }); }
@@ -71,15 +74,20 @@ try {
       const parts = [{ text: prompt }];
       let kb = 0;
       for (const bl of ((opt && opt.images) || [])) { const d = await b64(bl); kb += Math.round(d.length * 0.75 / 1024); parts.push({ inlineData: { data: d, mimeType: bl.type || 'image/jpeg' } }); }
-      let r = null, last = '', quota = false;
+      let r = null, last = '', quota = false, slow = '';
       for (const name of MODELS) {
+        if (slow && !isLite(name)) continue; // nach einer Zeitüberschreitung nur noch Lite-Modelle
+        const wait = isLite(name) ? AI_WAIT_LITE : AI_WAIT;
         try {
           const m = await getModel(name); aiStep = 'wartet auf KI-Antwort (' + name + (kb ? ', Foto ' + kb + ' KB' : '') + ')';
-          r = await Promise.race([m.generateContent(parts), new Promise((_, rej) => setTimeout(() => rej(new Error('FP_SLOW')), AI_WAIT))]);
+          r = await Promise.race([m.generateContent(parts), new Promise((_, rej) => setTimeout(() => rej(new Error('FP_SLOW')), wait))]);
           aiStep = 'Antwort da (' + name + ')'; try { localStorage.setItem('fp2_aimodel', name); } catch (x) {} break;
         } catch (e) {
           const s = String((e && e.message) || e); last = s;
-          if (s === 'FP_SLOW') throw { code: 'timeout', message: 'Die KI (' + name + ') hat in ' + (AI_WAIT / 1000) + ' Sekunden nicht geantwortet. Bitte gleich noch einmal versuchen' };
+          if (s === 'FP_SLOW') {
+            if (!isLite(name) && MODELS.some(isLite)) { slow = name; continue; }
+            throw { code: 'timeout', message: 'Die KI hat nicht rechtzeitig geantwortet (' + (slow ? slow + ', dann ' : '') + name + '). Bitte gleich noch einmal versuchen' };
+          }
           if (/\b429\b|quota|RESOURCE_EXHAUSTED/i.test(s)) { quota = true; continue; } // Tageslimit dieses Modells voll: nächstes Modell
           if (/\b404\b|\b50[0-4]\b|not found|not supported|is not available|no longer|retired|deprecated|high demand|overloaded|UNAVAILABLE|try again later|Interactions API/i.test(s)) continue; // Modell gibt es nicht (mehr) oder überlastet
           if (/app ?check/i.test(s)) throw { code: 'failed', message: 'App Check (' + (NATIVE ? (AC_DBG ? 'Android-Token' : 'Android') : APPCHECK_TYPE) + ', ' + acInfo + '): ' + name + ': ' + s.slice(-120) };
@@ -87,6 +95,7 @@ try {
         }
       }
       if (!r && quota) throw { code: 'rate_limited', message: 'Das kostenlose Tageslimit der KI ist erreicht. Ab etwa 9 Uhr morgens geht es wieder, bis dahin bitte den Betrag selbst eintragen' };
+      if (!r && slow) throw { code: 'timeout', message: 'Die KI hat nicht rechtzeitig geantwortet (' + slow + ', kein schnelles Modell erreichbar). Bitte gleich noch einmal versuchen' };
       if (!r) throw { code: 'failed', message: 'Kein Modell erreichbar: ' + last.slice(-160) };
       let t = r.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
       try { return JSON.parse(t); } catch (e) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a > -1 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (x) {} } throw { code: 'invalid_json', message: t.slice(0, 120) }; }

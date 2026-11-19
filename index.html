@@ -2708,7 +2708,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='18.11.2026 · 21:58';
+var APPVER='19.11.2026 · 19:05';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
