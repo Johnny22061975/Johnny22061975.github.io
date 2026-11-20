@@ -2708,7 +2708,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='19.11.2026 · 19:05';
+var APPVER='19.11.2026 · 19:28';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2799,6 +2799,28 @@ function kasseHTML(){ var L=kVis(setList('kasse')), ym=S.kYm||ymd(new Date()).sl
     +(M.length?'<details class="fld" open><summary class="lbl">Nach Bereich</summary>'+bar(byC)+'</details><details class="fld"><summary class="lbl">Nach Geschäft</summary>'+bar(byS)+'</details>'+(function(){ var V={}; M.forEach(function(x){ var o=kVat(x); Object.keys(o).forEach(function(r){ V[r]=V[r]||{g:0,t:0}; V[r].g+=o[r].g; V[r].t+=o[r].t; }); }); var h=kVatHTML(V); return h?'<details class="fld"><summary class="lbl">Mehrwertsteuer</summary>'+h+'<p class="hint">Nur Bons, die per Foto ausgelesen wurden.</p></details>':''; })()
       +'<div class="fld"><span class="lbl">Einträge</span>'+M.map(function(x){ var c=kcat(x.cat); return '<button type="button" class="krow" data-a="kedit" data-id="'+esc(x.id)+'"><span>'+c[1]+'</span><span><b>'+esc(x.shop||c[2])+'</b><small>'+esc(WD[weekday(x.d)]+', '+dmy(x.d)+(x.by&&PEOPLE.indexOf(x.by)>-1?' · '+pname(x.by):'')+(x.note?' · '+x.note:''))+'</small></span><b>'+eur(x.c)+'</b></button>'; }).join('')+'</div>'
       :'<p class="hint">In diesem Monat noch keine Ausgaben. Tipp auf „+ Ausgabe“ oder fotografiere einen Kassenbon.</p>'); }
+// ---------- Bon auf dem Handy lesen (Android-App, Google ML Kit) ----------
+var KSHOPS=[['rewe','REWE'],['aldi','ALDI'],['lidl','Lidl'],['edeka','EDEKA'],['netto','Netto'],['penny','Penny'],['kaufland','Kaufland'],['tegut','tegut'],['globus','Globus'],['norma','Norma'],['alnatura','Alnatura'],['denns','denn\'s'],['\\bdm\\b','dm'],['dm-drogerie','dm'],['rossmann','Rossmann'],['müller','Müller'],['aral','Aral'],['shell','Shell'],['esso','Esso'],['totalenergies','TotalEnergies'],['\\bjet\\b','JET'],['\\bomv\\b','OMV'],['agip','Agip'],['avia','Avia'],['\\bhem\\b','HEM'],['raiffeisen','Raiffeisen'],['mc ?donald','McDonald\'s'],['burger king','Burger King'],['\\bkfc\\b','KFC'],['subway','Subway'],['starbucks','Starbucks'],['backwerk','BackWerk'],['ikea','IKEA'],['obi\\b','OBI'],['bauhaus','Bauhaus'],['hornbach','Hornbach'],['toom','toom'],['action','Action'],['tedi','TEDi'],['\\bkik\\b','KiK'],['woolworth','Woolworth'],['deichmann','Deichmann'],['thalia','Thalia'],['media ?markt','MediaMarkt'],['saturn','Saturn'],['apotheke','Apotheke'],['bäckerei','Bäckerei'],['metzgerei','Metzgerei'],['fressnapf','Fressnapf'],['decathlon','Decathlon'],['h&m','H&M'],['primark','Primark'],['tchibo','Tchibo']];
+function kOcrRows(lines){ // Zeilen mit ähnlicher Höhe zu einer Bon-Zeile zusammenfügen (links Text, rechts Preis)
+  var L=(lines||[]).filter(function(l){ return l&&l.t; }).map(function(l){ return {t:String(l.t),x:+l.x||0,y:+l.y||0,h:Math.max(8,+l.h||0)}; }).sort(function(a,b){ return a.y-b.y; });
+  var rows=[]; L.forEach(function(l){ var c=l.y+l.h/2, row=null; for(var i=rows.length-1;i>=0&&i>=rows.length-4;i--){ if(Math.abs(rows[i].c-c)<Math.max(rows[i].h,l.h)*0.55){ row=rows[i]; break; } } if(row){ row.p.push(l); } else rows.push({c:c,h:l.h,p:[l]}); });
+  return rows.map(function(r){ return r.p.sort(function(a,b){ return a.x-b.x; }).map(function(p){ return p.t; }).join('  ').replace(/\s+/g,' ').trim(); }); }
+function kOcrParse(lines){
+  var rows=kOcrRows(lines), all=rows.join('\n'), low=all.toLowerCase(), AM=/(-?\d{1,4}[,.]\d{2})(?!\d)/g;
+  var amts=function(s){ var m=String(s).match(AM)||[]; return m.map(function(x){ return cents(x.replace('.',',')); }).filter(function(n){ return isFinite(n); }); };
+  var total=null, tRow=-1;
+  [/zu zahlen|zahlbetrag|endbetrag|gesamtbetrag/i,/(^|\s)(summe|gesamt|total)(\s|$|:)/i,/girocard|ec[- ]?karte|kartenzahlung|visa|mastercard|maestro/i].some(function(re){
+    for(var i=0;i<rows.length;i++){ if(re.test(rows[i])&&!/zwischen|netto|mwst|steuer|ust|brutto ?netto|rabatt|gespart/i.test(rows[i])){ var a=amts(rows[i]); if(!a.length&&rows[i+1]) a=amts(rows[i+1]); if(a.length){ total=a[a.length-1]; tRow=i; return true; } } } return false; });
+  var date='', td=ymd(new Date());
+  (all.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/g)||[]).some(function(s){ var p=s.split('.'), y=p[2].length===2?'20'+p[2]:p[2], d=y+'-'+('0'+p[1]).slice(-2)+'-'+('0'+p[0]).slice(-2); if(+p[1]>=1&&+p[1]<=12&&+p[0]>=1&&+p[0]<=31&&d<=td&&d>'2000'){ date=d; return true; } return false; });
+  var shop=''; KSHOPS.some(function(k){ if(new RegExp(k[0]).test(low)){ shop=k[1]; return true; } return false; });
+  if(!shop) rows.slice(0,5).some(function(r){ var t=r.replace(/[^A-Za-zÄÖÜäöüß&' .-]/g,'').trim(); if(t.length>=3&&!/willkommen|beleg|kassenbon|rechnung|quittung|filiale|tel|str\.|straße/i.test(t)){ shop=t.slice(0,30); return true; } return false; });
+  var items=[]; rows.slice(0,tRow>0?tRow:rows.length).forEach(function(r){ var m=r.match(/^(.*?[A-Za-zÄÖÜäöü].*?)\s+(-?\d{1,4}[,.]\d{2})\s*[A-Z*\d]{0,2}\s*$/); if(m&&!/summe|gesamt|zu zahlen|mwst|steuer|netto|brutto|gegeben|rückgeld|bar\b|karte|datum|uhrzeit|kasse|bon-nr|beleg/i.test(m[1])){ var n=m[1].replace(/\s+\d+([,.]\d+)?\s*(x|st|stk)\s*$/i,'').trim(); if(n.length>=2) items.push({n:n.slice(0,40),p:String(cents(m[2].replace('.',','))/100)}); } });
+  var cat=kFuel(shop)?'tanken':kFast(shop)?'essen':/dm|rossmann|müller/i.test(shop)?'drogerie':/apotheke/i.test(shop)?'gesundheit':/ikea|obi|bauhaus|hornbach|toom|action|tedi|woolworth/i.test(shop)?'haushalt':'lebensmittel';
+  return {shop:shop,date:date,total:total>0?(total/100).toFixed(2):'',cat:cat,items:items.slice(0,60),vat:[],text:rows.join('\n').slice(0,6000)}; }
+function kOcrNative(c){ return new Promise(function(res,rej){ if(!(window.FPNative&&window.FPNative.ocr)) return rej('kein Handy'); var id='o'+Date.now(), to=setTimeout(function(){ rej('Zeit'); },20000);
+  window.fpNativeOcr=function(i,j){ if(i!==id) return; clearTimeout(to); if(j&&j.ok) res(j); else rej((j&&j.err)||'Fehler'); };
+  try{ window.FPNative.ocr(id,c.toDataURL('image/jpeg',0.92).split(',')[1]); }catch(e){ clearTimeout(to); rej(String(e)); } }); }
 function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
   var fail=function(m){ if(S.kScan!==sc) return; sc.busy=false; sc.err=true; sc.msg=m; hhRender();
     if(window.FP_AIPING&&!sc.pinged&&/dauert zu lange/.test(m)){ sc.pinged=true; sc.msg+=' Prüfe die KI ohne Foto …'; hhRender(); window.FP_AIPING().then(function(t){ if(S.kScan!==sc) return; sc.msg=m+' '+t; hhRender(); }); } };
@@ -2810,15 +2832,33 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
         +'Bereiche (Schlüssel = Name): '+KCAT.map(function(c){ return c[0]+' = '+c[2]; }).join(', ')+'.\n'
         +'Antworte NUR mit JSON: {"shop":"Name des Geschäfts, kurz","date":"JJJJ-MM-TT","total":"Gesamtbetrag (zu zahlen) als Zahl mit Punkt, z. B. 23.45","cat":"passender Bereich-Schlüssel","items":[{"n":"Artikel kurz","p":"Preis als Zahl","q":"Menge mit Einheit, wenn auf dem Bon zu lesen, z. B. 0,312 kg, 2 Stück, 500 g, 6x1,5 l; sonst leer lassen","r":"Mehrwertsteuersatz des Artikels in Prozent: 7 oder 19 (oder 0); ergibt sich meist aus dem Buchstaben hinter dem Preis (z. B. A/B, 1/2) und der Steuer-Legende unten auf dem Bon"}],"vat":[{"r":"Steuersatz 7 oder 19","g":"Bruttobetrag dieses Satzes","t":"enthaltene MwSt"}],"note":"kurzer Hinweis, falls etwas unleserlich war, sonst leer"}\n'
         +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Restaurants, Fast Food und Lieferdienste gehören zum Bereich essen, Zigaretten und Tabak zum Bereich tabak, Benzin, Diesel, Öl und Autozubehör zum Bereich tanken. Erfinde nichts.';
-      var tmo=setTimeout(function(){ var st=''; try{ if(window.FP_AISTEP) st=' Hängt bei: '+window.FP_AISTEP()+'.'; }catch(x){} fail('Das Auslesen dauert zu lange (über 100 Sekunden).'+st); },100000);
-      S.sample.json(prompt,{images:[blob],modelTier:'default',cache:false}).then(function(r){ clearTimeout(tmo); if(S.kScan!==sc) return; sc.busy=false; var f=S.kf; if(!f) return;
-        var t=cents(String((r&&r.total)||'').replace('.',',')); if(!(t>0)){ sc.err=true; sc.msg='Ich konnte keinen Gesamtbetrag erkennen. Versuch ein schärferes Foto oder trag den Betrag selbst ein.'; hhRender(); return; }
+      var apply=function(r,okMsg){ if(S.kScan!==sc) return false; var f=S.kf; if(!f) return false;
+        var t=cents(String((r&&r.total)||'').replace('.',',')); if(!(t>0)) return false; sc.busy=false;
         f.amt=(t/100).toFixed(2).replace('.',','); if(r.shop) f.shop=String(r.shop).slice(0,40); if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')) f.date=r.date; if(kcat(r.cat)[0]===r.cat) f.cat=r.cat; if(kFast(f.shop)) f.cat='essen';
         var rate=function(v){ var n=parseFloat(String(v===undefined||v===null?'':v).replace(',','.')); return n===7||n===19||n===0?n:(n===5||n===16?n:null); };
         f.items=((r&&Array.isArray(r.items))?r.items:[]).slice(0,60).map(function(i){ var o={n:String((i&&i.n)||'').slice(0,40),c:cents(String((i&&i.p)||'').replace('.',','))}, rr=rate(i&&i.r), qq=String((i&&i.q)||'').replace(/\s+/g,' ').trim().slice(0,16); if(rr!==null) o.r=rr; if(qq&&!/^(null|-|0)$/i.test(qq)) o.q=qq; return o; }).filter(function(i){ return i.n&&isFinite(i.c); });
         f.vat=((r&&Array.isArray(r.vat))?r.vat:[]).slice(0,4).map(function(v){ return {r:rate(v&&v.r),g:cents(String((v&&v.g)||'').replace('.',',')),t:cents(String((v&&v.t)||'').replace('.',','))}; }).filter(function(v){ return v.r!==null&&isFinite(v.g)&&isFinite(v.t); });
-        sc.err=false; sc.msg=(r.note&&String(r.note).trim())?String(r.note).trim().slice(0,160):'Bon erkannt. Bitte kurz prüfen und speichern.'; hhRender();
-      },function(e){ clearTimeout(tmo); var st=''; try{ if(window.FP_AISTEP) st=' Schritt: '+window.FP_AISTEP()+'.'; }catch(x){} if(e&&e.code==='rate_limited'){ fail(String(e.message)+'.'); return; } fail('Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(-200)+').'+st); }); },'image/jpeg',0.85); }; im.src=fr.result; };
+        sc.err=false; sc.msg=(r.note&&String(r.note).trim())?String(r.note).trim().slice(0,160):(okMsg||'Bon erkannt. Bitte kurz prüfen und speichern.'); hhRender(); return true; };
+      var viaImage=function(){
+      var tmo=setTimeout(function(){ var st=''; try{ if(window.FP_AISTEP) st=' Hängt bei: '+window.FP_AISTEP()+'.'; }catch(x){} fail('Das Auslesen dauert zu lange (über 100 Sekunden).'+st); },100000);
+      S.sample.json(prompt,{images:[blob],modelTier:'default',cache:false}).then(function(r){ clearTimeout(tmo); if(S.kScan!==sc) return;
+        if(!apply(r)){ sc.busy=false; sc.err=true; sc.msg='Ich konnte keinen Gesamtbetrag erkennen. Versuch ein schärferes Foto oder trag den Betrag selbst ein.'; hhRender(); }
+      },function(e){ clearTimeout(tmo); var st=''; try{ if(window.FP_AISTEP) st=' Schritt: '+window.FP_AISTEP()+'.'; }catch(x){} if(e&&e.code==='rate_limited'){ fail(String(e.message)+'.'); return; } fail('Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(-200)+').'+st); }); };
+      // Android-App: zuerst auf dem Handy lesen (schnell, ohne Tageslimit); die KI verfeinert danach nur noch aus dem Text
+      if(window.FPNative&&window.FPNative.ocr){ sc.msg='Lese den Bon auf dem Handy …'; hhRender();
+        var oc=document.createElement('canvas'), ok2=Math.min(1,2400/Math.max(im.width,im.height)); oc.width=Math.round(im.width*ok2); oc.height=Math.round(im.height*ok2); oc.getContext('2d').drawImage(im,0,0,oc.width,oc.height);
+        kOcrNative(oc).then(function(j){ var loc=kOcrParse(j.lines);
+          if(!apply(loc,'Vom Handy gelesen. Bitte kurz prüfen. Die Artikel-Aufteilung kommt gleich noch …')) return viaImage();
+          sc.refine=true; hhRender();
+          var tp=prompt.replace('Du liest das Foto eines deutschen Kassenbons.','Du liest den Text eines deutschen Kassenbons (von einer Texterkennung, Zeilen können leicht verrutscht sein).')+'\n\nText des Bons:\n'+loc.text;
+          var keep=JSON.stringify(S.kf&&{amt:S.kf.amt,shop:S.kf.shop,date:S.kf.date});
+          Promise.race([S.sample.json(tp,{modelTier:'default',cache:false}),new Promise(function(_,rj){ setTimeout(function(){ rj('Zeit'); },45000); })]).then(function(r){
+            if(S.kScan!==sc) return; sc.refine=false; var f=S.kf; if(!f) return;
+            if(JSON.stringify({amt:f.amt,shop:f.shop,date:f.date})!==keep){ hhRender(); return; } // schon von Hand geändert: nichts überschreiben
+            if(!apply(r,'Bon erkannt. Bitte kurz prüfen und speichern.')){ sc.msg='Vom Handy gelesen. Bitte kurz prüfen und speichern.'; hhRender(); }
+          },function(){ if(S.kScan!==sc) return; sc.refine=false; sc.msg='Vom Handy gelesen. Bitte kurz prüfen und speichern (die genaue Aufteilung war gerade nicht möglich).'; hhRender(); });
+        },function(){ viaImage(); });
+      } else viaImage(); },'image/jpeg',0.85); }; im.src=fr.result; };
   fr.readAsDataURL(file); }
 
 // ---------- Vorräte ----------
