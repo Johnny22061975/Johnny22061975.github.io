@@ -1584,7 +1584,7 @@ function mapSkeleton(){ return '<p class="hint" id="mapShareNote" style="margin:
 function mapShareUI(){ document.querySelectorAll('[data-mapshare]').forEach(function(cb){ cb.checked=locOn(); }); var n=$('#mapShareNote'); if(n) n.textContent=!S.me||isGenName(S.me)?'Wähle zuerst unter Menü → Familie, wer du bist.':locOn()?'Du bist für die Familie sichtbar. Ausschalten: Menü → Familie → „Ich bin“.':'Du bist unsichtbar. Einschalten: Menü → Familie → „Ich bin“ → Auf der Karte sichtbar.'; }
 function mapCol(k){ var c=''; try{ c=getComputedStyle(document.documentElement).getPropertyValue('--p-'+k).trim(); }catch(e){} return /^#[0-9a-fA-F]{3,8}$/.test(c)?c:'#2f6fdc'; }
 function mapRoute(lat,lon){ return 'https://www.google.com/maps/dir/?api=1&destination='+lat+','+lon+'&travelmode=walking'; }
-function mapStatus(){ var el=$('#mapStatus'); if(!el) return; el.textContent=MAPV.err||(MAPV.busy)||(MAPV.map?(MAPV.me?'Deine Position ist auf ±'+Math.max(5,MAPV.me.acc)+' m genau.':'Position wird gesucht …'):'Karte lädt …'); el.className='hint'+(MAPV.err?' err':''); }
+function mapStatus(){ var el=$('#mapStatus'); if(!el) return; el.textContent=MAPV.err||(MAPV.busy)||(MAPV.map?(MAPV.me?'Deine Position ist auf ±'+Math.max(5,MAPV.me.acc)+' m genau.':'Position wird gesucht …'):'Karte lädt …'); el.className='hint'+(MAPV.err?' err':''); if(MAPV.map&&MAPV.follow&&!MAPV.err){ var who=MAPV.follow==='me'?'dir':pname(MAPV.follow); el.textContent+=' Die Karte folgt '+who+'. Zum Umsehen die Karte einfach verschieben.'; } }
 function mapPeople(){ return activePeople().filter(function(k){ return !isGenName(k); }); }
 function mapFamUI(){ var el=$('#mapFam'); if(!el) return; var rows=mapPeople().map(function(k){ var r=locRow(k), me=k===S.me, has=r&&r.on&&r.lat!==undefined, st=me?(locOn()?'teilt (du)':'teilt nicht (du)'):!r||!r.on?'teilt nicht':!has?'noch keine Position':locAgo(r.ts);
     var pos=me?MAPV.me:(has?r:null);
@@ -1601,7 +1601,10 @@ function mapDraw(){ if(!MAPV.map||!window.L) return; var pts=[];
     else { MAPV.acc=L.circle(ll2,{radius:Math.max(8,MAPV.me.acc),color:col,weight:1,fillOpacity:.12,interactive:false}).addTo(MAPV.map); MAPV.meMk=L.marker(ll2,{icon:mk?mapIcon(mk):L.divIcon({className:'mpin',html:'<span style="--pc:#2f6fdc">★</span>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:1000}).addTo(MAPV.map); }
     if(!MAPV.meMk.getPopup()) MAPV.meMk.bindPopup('<b>Du'+(mk?' ('+esc(pname(mk))+')':'')+'</b><br>Hier bist du.',{autoPan:false}); }
   else if(MAPV.meMk){ MAPV.map.removeLayer(MAPV.meMk); MAPV.map.removeLayer(MAPV.acc); MAPV.meMk=null; MAPV.acc=null; }
-  if(!MAPV.fitted&&pts.length){ MAPV.fitted=true; if(pts.length===1) MAPV.map.setView(pts[0],16); else MAPV.map.fitBounds(pts,{padding:[40,40],maxZoom:16}); } }
+  if(!MAPV.fitted&&pts.length){ MAPV.fitted=true; if(pts.length===1) MAPV.map.setView(pts[0],16); else MAPV.map.fitBounds(pts,{padding:[40,40],maxZoom:16}); }
+  // Mitfahren: Die Karte folgt dem gewählten Punkt (du oder ein Familienmitglied), bis man die Karte selbst verschiebt
+  var fk=MAPV.follow, fl=fk==='me'?(MAPV.me&&[MAPV.me.lat,MAPV.me.lon]):(fk&&locRow(fk)&&locRow(fk).on&&locRow(fk).lat!==undefined&&[locRow(fk).lat,locRow(fk).lon]);
+  if(fl&&MAPV.fitted){ var c=MAPV.map.getCenter(); if(Math.abs(c.lat-fl[0])>1e-5||Math.abs(c.lng-fl[1])>1e-5){ MAPV.autoPan=true; try{ MAPV.map.panTo(fl,{animate:true,duration:.8}); }catch(e){} setTimeout(function(){ MAPV.autoPan=false; },1200); } } }
 function mapStopsUI(){ var el=$('#mapStops'); if(el){ if(!MAPV.stops) el.innerHTML=''; else el.innerHTML='<div class="fld"><span class="lbl">Haltestellen in der Nähe</span>'+(MAPV.stops.length?MAPV.stops.map(function(s){ var on=MAPV.sel&&MAPV.sel.id===s.id; return '<button type="button" class="krow mstop" data-a="mapstop" data-id="'+esc(s.id)+'" data-n="'+esc(s.name)+'" data-la="'+s.lat+'" data-lo="'+s.lon+'" aria-pressed="'+!!on+'"><span>🚏</span><span><b>'+esc(s.name)+'</b><small>'+(on?'Abfahrten stehen unter der Karte':'Tippen für Abfahrten')+'</small></span><b>'+s.d+' m</b></button>'; }).join(''):'<p class="hint">Keine Haltestelle im Umkreis gefunden.</p>')+'</div>'; }
   mapDepsUI(); }
 function mapDepsUI(){ var el=$('#mapDeps'); if(!el) return; var s=MAPV.sel; if(!s){ el.innerHTML=''; return; }
@@ -1618,8 +1621,8 @@ function mapStopMarkers(){ if(!MAPV.map||!window.L) return; MAPV.stopMk.forEach(
 function mapDeps(id,name,lat,lon){ if(!id) return; if(MAPV.sel&&MAPV.sel.id===id){ MAPV.sel=null; MAPV.deps=null; mapStopsUI(); return; }
   MAPV.sel={id:id,name:name,lat:+lat||0,lon:+lon||0}; MAPV.deps=null; mapStopsUI(); var cv=$('#mapCanvas'); if(cv&&cv.scrollIntoView) try{ cv.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){}
   ftPost({rmv:id,line:'',dur:60}).then(function(r){ if(!MAPV.sel||MAPV.sel.id!==id) return; if(r.err||r.v!==4) throw new Error(r.err||'v'); MAPV.deps={list:(r.deps||[]).slice(0,14)}; mapStopsUI(); }).catch(function(e){ if(!MAPV.sel||MAPV.sel.id!==id) return; MAPV.deps={err:'Die Abfahrten konnten nicht geladen werden ('+String((e&&e.message)||e).slice(0,40)+').'}; mapStopsUI(); }); }
-function mapFocus(k){ if(!MAPV.map) return; var ll=k===S.me?(MAPV.me&&[MAPV.me.lat,MAPV.me.lon]):(locRow(k)&&locRow(k).lat!==undefined&&[locRow(k).lat,locRow(k).lon]); if(!ll) return; MAPV.map.setView(ll,16); var el=$('#mapCanvas'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'}); var mk=k===S.me?MAPV.meMk:MAPV.mk[k]; if(mk&&mk.openPopup) mk.openPopup(); }
-function mapMe(){ if(MAPV.me&&MAPV.map){ try{ MAPV.map.closePopup(); }catch(e){} MAPV.map.setView([MAPV.me.lat,MAPV.me.lon],16); return; } MAPV.err=''; locStart(); MAPV.busy='Position wird gesucht …'; mapStatus(); setTimeout(function(){ MAPV.busy=''; mapStatus(); },8000); }
+function mapFocus(k){ if(!MAPV.map) return; var ll=k===S.me?(MAPV.me&&[MAPV.me.lat,MAPV.me.lon]):(locRow(k)&&locRow(k).lat!==undefined&&[locRow(k).lat,locRow(k).lon]); if(!ll) return; MAPV.follow=k===S.me?'me':k; MAPV.map.setView(ll,16); mapStatus(); var el=$('#mapCanvas'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'}); var mk=k===S.me?MAPV.meMk:MAPV.mk[k]; if(mk&&mk.openPopup) mk.openPopup(); }
+function mapMe(){ MAPV.follow='me'; if(MAPV.me&&MAPV.map){ try{ MAPV.map.closePopup(); }catch(e){} MAPV.map.setView([MAPV.me.lat,MAPV.me.lon],16); mapStatus(); return; } MAPV.err=''; locStart(); MAPV.busy='Position wird gesucht …'; mapStatus(); setTimeout(function(){ MAPV.busy=''; mapStatus(); },8000); }
 function goMin(m){ return m>=60?Math.floor(m/60)+' Std '+(m%60?m%60+' Min':''):m+' Min'; }
 function goBoard(t){ var w=0,b=null; for(var i=0;i<t.legs.length;i++){ var g=t.legs[i]; if(g.w){ w+=g.d; continue; } b=g; break; } return b?{leg:b,walk:w}:null; }
 function goErr(c){ c=String(c||''); if(c==='keinziel'||/NO_MATCH/.test(c)) return 'Dieses Ziel habe ich nicht gefunden. Versuch es mit Ort und Straße oder dem Namen der Haltestelle.'; if(c==='nokey') return 'Im Cloudflare-Helfer fehlt der RMV-Schlüssel.'; if(c==='kurz') return 'Bitte ein Ziel mit mindestens 3 Buchstaben eingeben.';
@@ -1649,7 +1652,7 @@ function renderMap(){ var box=$('#mapBox'); if(!box) return; if(!box.firstChild)
   mapShareUI(); mapFamUI(); mapStopsUI(); mapStatus(); locStart();
   if(MAPV.map){ setTimeout(function(){ try{ MAPV.map.invalidateSize(); mapDraw(); }catch(e){} },80); return; }
   mapLib().then(function(){ if(MAPV.map||!$('#mapCanvas')) return; MAPV.map=L.map('mapCanvas',{zoomControl:true,attributionControl:false}).setView([50.336,8.536],13);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(MAPV.map); mapDraw(); mapStatus(); setTimeout(function(){ try{ MAPV.map.invalidateSize(); }catch(e){} },200); },
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(MAPV.map); MAPV.follow='me'; MAPV.map.on('dragstart',function(){ if(MAPV.follow){ MAPV.follow=null; mapStatus(); } }); mapDraw(); mapStatus(); setTimeout(function(){ try{ MAPV.map.invalidateSize(); }catch(e){} },200); },
     function(){ MAPV.err='Die Karte konnte nicht geladen werden. Prüf die Internetverbindung.'; mapStatus(); }); }
 /* ---------- Wetter (Open-Meteo, ohne Schlüssel; Ort fest Usingen) ---------- */
 var WX={d:null,cv:null,raf:0,kind:'',t0:0,ps:[],last:0};
@@ -2708,7 +2711,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='20.11.2026 · 10:28';
+var APPVER='20.11.2026 · 10:47';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
