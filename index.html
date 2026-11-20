@@ -1299,7 +1299,7 @@ function renderShop(){
   S._pm=hhOn('kasse')?kPriceMap():null;
   var items=S.shop.slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
   var open=items.filter(function(i){ return !i.done; }), done=items.filter(function(i){ return i.done; });
-  $('#shopList').innerHTML=open.length?open.map(shopRow).join(''):'<li class="empty">'+(S.loaded.shop?'Die Liste ist leer. Was fehlt?':'Lädt …')+'</li>';
+  $('#shopList').innerHTML=kSugHTML()+(open.length?open.map(shopRow).join(''):'<li class="empty">'+(S.loaded.shop?'Die Liste ist leer. Was fehlt?':'Lädt …')+'</li>');
   $('#shopDone').innerHTML=done.length?'<div class="sec-h"><span>Erledigt ('+done.length+')</span><button class="btn sm" data-a="cleardone">Alle entfernen</button></div><ul class="list">'+done.map(shopRow).join('')+'</ul>':'';
   renderTabs();
 }
@@ -2711,7 +2711,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='20.11.2026 · 13:39';
+var APPVER='20.11.2026 · 15:50';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2764,21 +2764,28 @@ function kSpecial(n){ var s=String(n||'').toLowerCase(); if(/zigarett|tabak|marl
 function kFast(s){ return /mc\s?donald|burger\s?king|\bkfc\b|subway|pizzeria|restaurant|ristorante|trattoria|döner|doener|imbiss|vapiano|l'osteria|nordsee|gasthaus|gaststätte|five guys|domino|pizza hut|wienerwald|ihop|dunkin|starbucks|backwerk|burgerme|hans im glück/.test(String(s||'').toLowerCase()); }
 function kFuel(s){ return /tankstelle|\baral\b|\bshell\b|\besso\b|\bjet\b|\bomv\b|\bagip\b|\bavia\b|\btotalenergies\b|\bhem\b|\bbft\b|\bhoyer\b|tank\s?&\s?rast|autohof|raststätte|kiosk|späti|spätkauf|trinkhalle|büdchen/.test(String(s||'').toLowerCase()); }
 function kSkip(x,i){ return !!((x&&(x.cat==='tanken'||x.cat==='tabak'||x.cat==='essen'||kFast(x.shop)))||kSpecial(i&&i.n)); }
+// Nur Lebensmittel und Getränke zählen für Vorräte und KI-Vorschläge (keine Spielwaren, Geschenke, Imbiss)
+function kFoodBon(x){ return !!(x&&x.cat==='lebensmittel'&&!kFast(x.shop)&&!kFuel(x.shop)); }
+function kNonFood(n){ return /tonies|spiel|geschenk|papier|kosmos|galileo|parf(ü|u|ue)m|labor|triops|tanner|kristall|lego|playmobil|puzzle|batterie|grußkarte|gutschein|deko|kerze|buch\b|zeitschrift|tasche|socken|shirt/i.test(String(n||'')); }
 function kNice(n){ n=String(n||'').replace(/\s+/g,' ').trim(); return n.charAt(0).toUpperCase()+n.slice(1); }
 function kRhythm(){ var by={}, today=ymd(new Date());
-  kVis(setList('kasse')).forEach(function(x){ if(!x.d||!x.items) return; x.items.forEach(function(i){ if(!(i.c>0)||kSkip(x,i)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=by[k]=by[k]||{dates:{},name:i.n,last:'',q:''}; o.dates[x.d]=1; if(x.d>=o.last){ o.last=x.d; o.name=i.n; if(i.q) o.q=i.q; } }); });
-  return Object.keys(by).map(function(k){ var o=by[k], ds=Object.keys(o.dates).sort(); if(ds.length<3) return null;
+  kVis(setList('kasse')).forEach(function(x){ if(!x.d||!x.items||!kFoodBon(x)) return; x.items.forEach(function(i){ if(!(i.c>0)||kSkip(x,i)||kNonFood(i.n)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var o=by[k]=by[k]||{dates:{},name:i.n,last:'',q:''}; o.dates[x.d]=1; if(x.d>=o.last){ o.last=x.d; o.name=i.n; if(i.q) o.q=i.q; } }); });
+  return Object.keys(by).map(function(k){ var o=by[k], ds=Object.keys(o.dates).sort(); if(ds.length<2) return null;
     var gaps=[]; for(var q=1;q<ds.length;q++) gaps.push(Math.round((new Date(ds[q])-new Date(ds[q-1]))/86400000)); gaps.sort(function(a,b){ return a-b; });
-    var iv=gaps[Math.floor(gaps.length/2)]; if(!(iv>=3&&iv<=60)) return null; var since=Math.round((new Date(today)-new Date(o.last))/86400000);
+    var iv=gaps[Math.floor(gaps.length/2)]; if(!(iv>=2&&iv<=60)) return null; var since=Math.round((new Date(today)-new Date(o.last))/86400000);
     return {key:k,name:kNice(o.name),q:o.q||'',iv:iv,last:o.last,due:since>=iv,n:ds.length}; }).filter(Boolean); }
-function kAutoShop(force){ if(!S.store||!S.loaded||!S.loaded.shop||!S.loaded.settings||!S.me) return; var now=Date.now(), lt=+(lsGet('kai_t')||0); if(!force&&now-lt<6*3600000) return; lsSet('kai_t',String(now));
-  var R=kRhythm().filter(function(r){ return r.due; }); if(!R.length) return;
-  var st=JSON.parse(JSON.stringify((S.settingsRows||{}).kai||{})); delete st.id; var openN={}; (S.shop||[]).forEach(function(i){ if(!i.done) openN[kNorm(i.name)]=1; });
-  var add=R.filter(function(r){ return !openN[r.key]&&!(st[r.key]&&st[r.key]>=r.last); }); if(!add.length) return;
-  var ts=Date.now(); add.slice(0,15).forEach(function(r,i){ st[r.key]=ymd(new Date()); var id=S.store.newId(); safe(function(){ return S.store.set('shop',id,{name:r.name.slice(0,80),q:String(r.q||'').slice(0,16),who:'',done:false,ts:ts+i,by:S.me||'',ai:true,aiNote:'kaufst du etwa alle '+r.iv+' Tage'}); }); });
+// KI-Vorschläge: Was ist wahrscheinlich bald alle? Wird auf der Einkaufsliste gefragt ("Auf die Liste?"), nicht still eingetragen.
+function kPretty(n){ n=String(n||''); return /[a-zäöüß]/.test(n)?n:n.toLowerCase().replace(/(^|[\s-])\S/g,function(s){ return s.toUpperCase(); }); }
+function kSuggest(){ if(!S.loaded||!S.loaded.shop) return []; var st=(S.settingsRows||{}).kai||{}, openN={}; (S.shop||[]).forEach(function(i){ if(!i.done) openN[kNorm(i.name)]=1; });
+  return kRhythm().filter(function(r){ return r.due&&!openN[r.key]&&!(st[r.key]&&st[r.key]>=r.last); }).slice(0,8); }
+function kSugAnswer(key,yes){ var r=kRhythm().filter(function(x){ return x.key===key; })[0]; var st=JSON.parse(JSON.stringify((S.settingsRows||{}).kai||{})); delete st.id; st[key]=ymd(new Date());
+  if(yes&&r&&S.store){ var id=S.store.newId(); safe(function(){ return S.store.set('shop',id,{name:kPretty(r.name).slice(0,80),q:String(r.q||'').slice(0,16),who:'',done:false,ts:Date.now(),by:S.me||'',ai:true,aiNote:'kaufst du etwa alle '+r.iv+' Tage'}); }); toast(kPretty(r.name)+' steht jetzt auf der Liste.'); }
   S.settingsRows=S.settingsRows||{}; S.settingsRows.kai=st; saveSettings('kai',st); }
-function kToVorrat(rec){ if(!hhOn('vorrat')||!rec.items||!rec.items.length) return 0; var L=setList('vorrat').slice(), n=0;
-  rec.items.forEach(function(i){ if(!(i.c>0)||kSkip(rec,i)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var v=L.filter(function(y){ return kNorm(y.name)===k; })[0];
+function kSugHTML(){ var L=kSuggest(); if(!L.length) return '';
+  return L.map(function(r){ return '<li class="item ksug"><span class="nm">💡 <b>'+esc(kPretty(r.name))+'</b> ist wahrscheinlich bald alle<small class="aitag">✨ kaufst du etwa alle '+r.iv+' Tage · zuletzt '+esc(r.last.slice(8,10)+'.'+r.last.slice(5,7)+'.')+'</small></span><button type="button" class="btn sm pri" data-a="ksugy" data-k="'+esc(r.key)+'">Auf die Liste</button><button type="button" class="btn sm" data-a="ksugn" data-k="'+esc(r.key)+'">Nein</button></li>'; }).join(''); }
+function kAutoShop(){ /* früher: still eintragen. Jetzt fragt die Einkaufsliste nach (kSugHTML). */ }
+function kToVorrat(rec){ if(!hhOn('vorrat')||!rec.items||!rec.items.length||!kFoodBon(rec)) return 0; var L=setList('vorrat').slice(), n=0;
+  rec.items.forEach(function(i){ if(!(i.c>0)||kSkip(rec,i)||kNonFood(i.n)) return; var k=kNorm(i.n); if(k.length<3||/pfand|rabatt|leergut|tüte|tragetasche/.test(k)) return; var v=L.filter(function(y){ return kNorm(y.name)===k; })[0];
     if(v){ L=L.map(function(y){ return y===v?Object.assign({},y,{qty:Math.min(999,(y.qty||0)+1),last:i.q||y.last||''}):y; }); } else L.push({id:S.store.newId(),name:kNice(i.n).slice(0,40),qty:1,min:0,unit:'',last:i.q||''}); n++; });
   if(n) setListSave('vorrat',L); return n; }
 function kGrab(){ var f=S.kf; if(!f) return; [['amt','kAmt'],['shop','kShop'],['note','kNote']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
@@ -2892,6 +2899,8 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
 
 // ---------- Vorräte ----------
 function vGrab(){ var f=S.vf; if(!f) return; [['name','vName'],['qty','vQty'],['min','vMin'],['unit','vUnit']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
+function vJunk(){ var food={}, non={}; kVis(setList('kasse')).forEach(function(x){ (x.items||[]).forEach(function(i){ var k=kNorm(i.n); if(kFoodBon(x)) food[k]=1; else non[k]=1; }); });
+  return setList('vorrat').filter(function(v){ var k=kNorm(v.name); return (non[k]&&!food[k])||kNonFood(v.name); }); }
 function vorratHTML(){ var f=S.vf;
   if(f) return '<div class="fld"><label class="lbl" for="vName">Was?</label><input type="text" id="vName" maxlength="40" value="'+esc(f.name||'')+'" placeholder="z. B. Milch, Toilettenpapier"></div>'
     +'<div class="hrin"><div class="fld"><label class="lbl" for="vQty">Vorrat</label><input type="number" id="vQty" min="0" max="999" inputmode="numeric" value="'+esc(f.qty!=null?f.qty:1)+'"></div><div class="fld"><label class="lbl" for="vMin">Nachkaufen ab</label><input type="number" id="vMin" min="0" max="999" inputmode="numeric" value="'+esc(f.min!=null?f.min:1)+'"></div></div>'
@@ -2899,11 +2908,12 @@ function vorratHTML(){ var f=S.vf;
     +(f.msg?'<p class="hint err">'+esc(f.msg)+'</p>':'')
     +'<div class="btns"><button type="button" class="btn pri grow" data-a="vsave">Speichern</button>'+(f.id?'<button type="button" class="btn danger" data-a="vdel">'+(f.del?'Wirklich löschen?':'Löschen')+'</button>':'')+'</div>';
   var L=setList('vorrat').slice().sort(function(a,b){ var la=(a.qty<=a.min), lb=(b.qty<=b.min); return (lb-la)||String(a.name).localeCompare(String(b.name),'de'); });
+  var due={}; try{ kRhythm().forEach(function(r){ if(r.due) due[r.key]=r; }); }catch(e){} var junk=vJunk();
   return (L.length?L.map(function(x){ var low=x.qty<=x.min, onList=(S.shop||[]).some(function(it){ return !it.done&&String(it.name||'').toLowerCase()===String(x.name).toLowerCase(); });
-      return '<div class="vrow'+(low?' low':'')+'"><button type="button" class="vname" data-a="vedit" data-id="'+esc(x.id)+'"><b>'+esc(x.name)+'</b><small>'+(low?'⚠️ wird knapp':'Nachkaufen ab '+x.min)+(x.last?' · zuletzt '+esc(x.last):'')+'</small></button><button type="button" class="btn sm" data-a="vqty" data-id="'+esc(x.id)+'" data-n="-1" aria-label="Eins weniger">−</button><span class="vq">'+x.qty+(x.unit?' <small>'+esc(x.unit)+'</small>':'')+'</span><button type="button" class="btn sm" data-a="vqty" data-id="'+esc(x.id)+'" data-n="1" aria-label="Eins mehr">+</button>'
+      return '<div class="vrow'+(low?' low':'')+'"><button type="button" class="vname" data-a="vedit" data-id="'+esc(x.id)+'"><b>'+esc(x.name)+'</b><small>'+(low?'⚠️ wird knapp':due[kNorm(x.name)]?'⏳ wahrscheinlich bald alle (kaufst du etwa alle '+due[kNorm(x.name)].iv+' Tage)':'Nachkaufen ab '+x.min)+(x.last?' · zuletzt '+esc(x.last):'')+'</small></button><button type="button" class="btn sm" data-a="vqty" data-id="'+esc(x.id)+'" data-n="-1" aria-label="Eins weniger">−</button><span class="vq">'+x.qty+(x.unit?' <small>'+esc(x.unit)+'</small>':'')+'</span><button type="button" class="btn sm" data-a="vqty" data-id="'+esc(x.id)+'" data-n="1" aria-label="Eins mehr">+</button>'
         +(low?'<button type="button" class="btn sm'+(onList?'':' pri')+' vshop" data-a="vshop" data-id="'+esc(x.id)+'"'+(onList?' disabled':'')+'>'+(onList?'✓ steht auf der Liste':'🛒 auf die Einkaufsliste')+'</button>':'')+'</div>'; }).join('')
     :'<p class="hint">Noch keine Vorräte. Trag ein, was ihr immer im Haus haben wollt. Wird etwas knapp, kommt es mit einem Tipp auf die Einkaufsliste.</p>')
-    +'<div class="btns"><button type="button" class="btn pri" data-a="vnew">+ Vorrat hinzufügen</button></div>'; }
+    +'<div class="btns"><button type="button" class="btn pri" data-a="vnew">+ Vorrat hinzufügen</button>'+(junk.length?'<button type="button" class="btn" data-a="vclean">🧹 '+junk.length+' Nicht-Lebensmittel entfernen</button>':'')+'</div>'; }
 
 // ---------- Fristen ----------
 function fGrab(){ var f=S.ff; if(!f) return; [['title','fTitle'],['rem','fRem'],['note','fNote']].forEach(function(o){ var e=$('#'+o[1]); if(e) f[o[0]]=e.value; }); }
@@ -2931,6 +2941,8 @@ function hhClick(a,t){ var L,i,x;
   if(a==='kedit'){ x=setList('kasse').filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.kScan=null; S.kf={id:x.id,amt:(x.c/100).toFixed(2).replace('.',','),shop:x.shop||'',date:x.d,cat:x.cat,note:x.note||'',items:x.items||[],vat:x.vat||[]}; hhRender(); shTop(); return true; }
   if(a==='kcat'){ kGrab(); S.kf.cat=t.dataset.v; hhRender(); return true; }
   if(a==='ksave'){ kGrab(); var f=S.kf, c=cents(f.amt); if(!(c>0)){ f.msg='Bitte einen Betrag eintragen.'; hhRender(); return true; } if(!/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')) f.date=ymd(new Date());
+    if(!f.id&&!f.dupOk){ var dup=setList('kasse').filter(function(y){ return y.d===f.date&&y.c===c&&String(y.shop||'').trim().toLowerCase()===String(f.shop||'').trim().toLowerCase(); })[0];
+      if(dup){ f.dupOk=true; f.msg='Diesen Bon ('+(f.shop||'ohne Geschäft')+', '+eur(c)+') hast du schon gespeichert. Nochmal auf „Speichern“ tippen, wenn du ihn trotzdem doppelt willst.'; hhRender(); return true; } }
     var kExtra=[], kNoMain=false; if(!f.id&&f.items&&f.items.length){ var gs={tabak:[],tanken:[],essen:[]}, rest=[], fuelShop=kFuel(f.shop); f.items.forEach(function(i){ var g=kSpecial(i.n); if(g&&i.c>0) gs[g].push(i); else if(fuelShop&&!g) gs.essen.push(i); else rest.push(i); });
       var sumc=function(a){ return a.reduce(function(s,i){ return s+i.c; },0); }, ng=(gs.tabak.length?1:0)+(gs.tanken.length?1:0)+(gs.essen.length?1:0), restC=sumc(rest.filter(function(i){ return i.c>0; }));
       if(ng&&!(ng===1&&!restC)){ var kd=/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')?f.date:ymd(new Date()), sx=0;
@@ -2940,6 +2952,7 @@ function hhClick(a,t){ var L,i,x;
     var rec={id:f.id||S.store.newId(),c:c,shop:String(f.shop||'').trim().slice(0,40),d:f.date,cat:f.cat||'sonst',note:String(f.note||'').trim().slice(0,80),by:S.me||'',ts:Date.now()}; if(f.items&&f.items.length) rec.items=f.items.slice(0,60); if(f.vat&&f.vat.length) rec.vat=f.vat.slice(0,4); if(f.id){ var old=setList('kasse').filter(function(y){ return y.id===f.id; })[0]; if(old&&old.by) rec.by=old.by; }
     L=setList('kasse').filter(function(y){ return y.id!==rec.id; }); if(!kNoMain) L.push(rec); kExtra.forEach(function(r2){ L.push(r2); }); if(L.length>3000) L=L.sort(function(a2,b2){ return a2.d<b2.d?1:-1; }).slice(0,3000); setListSave('kasse',L); var nv=f.id||kNoMain?0:kToVorrat(rec); S.kYm=rec.d.slice(0,7); S.kf=null; S.kScan=null; toast('Gespeichert: '+eur(c)+(nv?' · '+nv+' Artikel in den Vorräten':'')); setTimeout(function(){ kAutoShop(true); },800); hhRender(); shTop(); return true; }
   if(a==='kdel'){ if(!S.kf.del){ kGrab(); S.kf.del=true; hhRender(); return true; } var kid=S.kf.id; setListSave('kasse',setList('kasse').filter(function(y){ return y.id!==kid; })); S.kf=null; hhRender(); return true; }
+  if(a==='vclean'){ var jk={}; vJunk().forEach(function(v){ jk[v.id]=1; }); var nL=setList('vorrat').filter(function(v){ return !jk[v.id]; }), nn=setList('vorrat').length-nL.length; setListSave('vorrat',nL); toast(nn+' Artikel aus den Vorräten entfernt.'); hhRender(); return true; }
   if(a==='vnew'){ S.vf={qty:1,min:1}; hhRender(); shTop(); return true; }
   if(a==='vedit'){ x=setList('vorrat').filter(function(y){ return y.id===t.dataset.id; })[0]; if(!x) return true; S.vf={id:x.id,name:x.name,qty:x.qty,min:x.min,unit:x.unit||'',last:x.last||''}; hhRender(); shTop(); return true; }
   if(a==='vsave'){ vGrab(); var v=S.vf; if(!String(v.name||'').trim()){ v.msg='Bitte eintragen, was es ist.'; hhRender(); return true; }
@@ -3407,6 +3420,8 @@ document.addEventListener('click',function(e){
     case 'chatsend': sendChat(); break;
     case 'chatdel': if(S.chatOpen&&S.chatOpen!=='all'){ if(!S.chatDel){ S.chatDel=true; renderNotes(); break; } var dcid=S.chatOpen; chatMsgs(dcid).forEach(function(n){ safe(function(){ return S.store.remove('notes',n.id); }); }); safe(function(){ return S.store.remove('chats',dcid); }); S.chatOpen=''; S.chatDel=false; renderNotes(); } break;
     case 'verupd': verReload(); break;
+    case 'ksugy': kSugAnswer(t.dataset.k,true); renderShop(); break;
+    case 'ksugn': kSugAnswer(t.dataset.k,false); renderShop(); break;
     case 'appupd': try{ window.fpUpdMsg=function(m){ toast(m); }; toast('Suche nach App-Update …'); window.FPNative.appUpdate(); }catch(e){} break;
     case 'verlater': S.verLater=S.newVer; verModal(); break;
     case 'delnote': safe(function(){ return S.store.remove('notes',t.dataset.id); }); break;
