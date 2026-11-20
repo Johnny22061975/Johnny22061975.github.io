@@ -2708,7 +2708,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='20.11.2026 · 10:04';
+var APPVER='20.11.2026 · 10:28';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2836,6 +2836,13 @@ function kOcrParse(lines){
     var o={n:n.slice(0,40),p:String(cents(m[2].replace(/\s/g,'').replace('.',','))/100)}; var k=(m[3]||'').toLowerCase(); if(k&&lr[k]!==undefined) o.r=String(lr[k]); items.push(o); });
   var cat=kFuel(shop)?'tanken':kFast(shop)?'essen':/^(dm|rossmann|müller)$/i.test(shop)?'drogerie':/apotheke/i.test(shop)?'gesundheit':/ikea|obi|bauhaus|hornbach|toom|action|tedi|woolworth/i.test(shop)?'haushalt':'lebensmittel';
   return {shop:shop,date:date,total:total>0?(total/100).toFixed(2):'',cat:cat,items:items.slice(0,60),vat:vat,text:rows.join('\n').slice(0,6000)}; }
+// Browser: Texterkennung mit Tesseract (kostenlos, läuft im Browser; beim ersten Mal ca. 5 MB laden)
+var kTess=null;
+function kOcrWeb(c){ var load=kTess||(kTess=new Promise(function(res,rej){ var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; s.onload=function(){ window.Tesseract.createWorker('deu').then(res,rej); }; s.onerror=function(){ rej('laden'); }; document.head.appendChild(s); }));
+  load.catch(function(){ kTess=null; });
+  return Promise.race([load.then(function(w){ return w.recognize(c); }).then(function(r){ var d=(r&&r.data)||{};
+      return {ok:true,lines:(d.lines||[]).map(function(l){ var b=l.bbox||{}; return {t:String(l.text||'').trim(),x:b.x0||0,y:b.y0||0,h:(b.y1||0)-(b.y0||0)}; })}; }),
+    new Promise(function(_,rj){ setTimeout(function(){ rj('Zeit'); },90000); })]); }
 function kOcrNative(c){ return new Promise(function(res,rej){ if(!(window.FPNative&&window.FPNative.ocr)) return rej('kein Handy'); var id='o'+Date.now(), to=setTimeout(function(){ rej('Zeit'); },20000);
   window.fpNativeOcr=function(i,j){ if(i!==id) return; clearTimeout(to); if(j&&j.ok) res(j); else rej((j&&j.err)||'Fehler'); };
   try{ window.FPNative.ocr(id,c.toDataURL('image/jpeg',0.92).split(',')[1]); }catch(e){ clearTimeout(to); rej(String(e)); } }); }
@@ -2863,18 +2870,19 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
         if(!apply(r)){ sc.busy=false; sc.err=true; sc.msg='Ich konnte keinen Gesamtbetrag erkennen. Versuch ein schärferes Foto oder trag den Betrag selbst ein.'; hhRender(); }
       },function(e){ clearTimeout(tmo); var st=''; try{ if(window.FP_AISTEP) st=' Schritt: '+window.FP_AISTEP()+'.'; }catch(x){} if(e&&e.code==='rate_limited'){ fail(String(e.message)+'.'); return; } fail('Das Auslesen hat nicht geklappt ('+String((e&&(e.message||e.code))||'unbekannt').slice(-200)+').'+st); }); };
       // Android-App: zuerst auf dem Handy lesen (schnell, ohne Tageslimit); die KI verfeinert danach nur noch aus dem Text
-      if(window.FPNative&&window.FPNative.ocr){ sc.msg='Lese den Bon auf dem Handy …'; hhRender();
+      var nat=!!(window.FPNative&&window.FPNative.ocr), ocrF=nat?kOcrNative:kOcrWeb, src=nat?'Vom Handy gelesen':'Vom Bon gelesen';
+      if(true){ sc.msg=nat?'Lese den Bon auf dem Handy …':'Lese den Bon … (beim ersten Mal kann das etwas dauern)'; hhRender();
         var oc=document.createElement('canvas'), ok2=Math.min(1,2400/Math.max(im.width,im.height)); oc.width=Math.round(im.width*ok2); oc.height=Math.round(im.height*ok2); oc.getContext('2d').drawImage(im,0,0,oc.width,oc.height);
-        kOcrNative(oc).then(function(j){ var loc=kOcrParse(j.lines);
-          if(!apply(loc,'Vom Handy gelesen. Bitte kurz prüfen. Die Artikel-Aufteilung kommt gleich noch …')) return viaImage();
+        ocrF(oc).then(function(j){ var loc=kOcrParse(j.lines);
+          if(!apply(loc,src+'. Bitte kurz prüfen. Die Artikel-Aufteilung kommt gleich noch …')) return viaImage();
           sc.refine=true; hhRender();
           var tp=prompt.replace('Du liest das Foto eines deutschen Kassenbons.','Du liest den Text eines deutschen Kassenbons (von einer Texterkennung, Zeilen können leicht verrutscht sein).')+'\n\nText des Bons:\n'+loc.text;
           var keep=JSON.stringify(S.kf&&{amt:S.kf.amt,shop:S.kf.shop,date:S.kf.date});
           Promise.race([S.sample.json(tp,{modelTier:'default',cache:false}),new Promise(function(_,rj){ setTimeout(function(){ rj('Zeit'); },45000); })]).then(function(r){
             if(S.kScan!==sc) return; sc.refine=false; var f=S.kf; if(!f) return;
             if(JSON.stringify({amt:f.amt,shop:f.shop,date:f.date})!==keep){ hhRender(); return; } // schon von Hand geändert: nichts überschreiben
-            if(!apply(r,'Bon erkannt. Bitte kurz prüfen und speichern.')){ sc.msg='Vom Handy gelesen. Bitte kurz prüfen und speichern.'; hhRender(); }
-          },function(){ if(S.kScan!==sc) return; sc.refine=false; sc.msg='Vom Handy gelesen. Bitte kurz prüfen und speichern (die genaue Aufteilung war gerade nicht möglich).'; hhRender(); });
+            if(!apply(r,'Bon erkannt. Bitte kurz prüfen und speichern.')){ sc.msg=src+'. Bitte kurz prüfen und speichern.'; hhRender(); }
+          },function(){ if(S.kScan!==sc) return; sc.refine=false; sc.msg=src+'. Bitte kurz prüfen und speichern (die genaue Aufteilung war gerade nicht möglich).'; hhRender(); });
         },function(){ viaImage(); });
       } else viaImage(); },'image/jpeg',0.85); }; im.src=fr.result; };
   fr.readAsDataURL(file); }
@@ -2954,6 +2962,7 @@ function settingsSheetHTML(){
     +'<div class="mlist">'
     +(S.fbUser&&!(S.settingsRows&&S.settingsRows.migrated)?'<label class="mrow filebtn" style="position:relative"><span class="mi">📦</span><span class="mt">Daten aus der Claude-Version übernehmen</span><span class="ms">Datei umzug.json wählen</span>'+ic('chevR',18)+'<input type="file" class="impfile" accept=".json,application/json"></label>':'')
     +MENUP.filter(function(m){ return m[0]!=='fristen'&&m[0]!=='wecker'; }).map(function(m){ return '<button type="button" class="mrow" data-a="mpage" data-v="'+m[0]+'"><span class="mi">'+m[1]+'</span><span class="mt">'+esc(m[2])+'</span><span class="ms">'+esc(menuSummary(m[0]))+'</span>'+ic('chevR',18)+'</button>'; }).join('')+'<button type="button" class="mrow" data-a="help"><span class="mi">❓</span><span class="mt">Hilfe & Tipps</span><span class="ms">Auch: Rückmeldung schicken</span>'+ic('chevR',18)+'</button></div>'
+    +(window.FPNative&&window.FPNative.appUpdate?'<div class="mlist"><button type="button" class="mrow" data-a="appupd"><span class="mi">⬇️</span><span class="mt">Nach App-Update suchen</span><span class="ms">Android-App Version '+(function(){ try{ return String(window.FPNative.appVersion()); }catch(e){ return '?'; } })()+'</span></button></div>':'')
     +'<p class="hint" style="text-align:center;margin-top:10px">App-Version '+APPVER+'</p>'+(S.fbUser?'<div class="mlist"><button type="button" class="mrow" data-a="fblogout"><span class="mi">🚪</span><span class="mt">Abmelden</span><span class="ms">'+esc(S.fbUser.email)+'</span></button></div>':'');
   var title=(MENUP.filter(function(m){ return m[0]===pg; })[0]||['','','Menü'])[2], body='';
   if(pg==='darst') body='<div class="fld"><span class="lbl">Darstellung</span><div class="chips">'+[['light','Hell'],['dark','Dunkel'],['auto','Wie das Handy']].map(function(o){ return '<button type="button" class="chip" data-a="theme" data-v="'+o[0]+'" aria-pressed="'+(S.theme===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div></div>'+(function(){ var bv=parseFloat(lsGet('bwv')); if(!(bv>=0)) bv=({fine:1,normal:1.5,strong:2.5})[lsGet('contour')||'normal']||1.5; var cc=lsGet('ctcol')||'std', own=/^hsl/.test(cc), m=own?/hsl\((\d+),\s*\d+%,\s*(\d+)%\)/.exec(cc):null, hu=m?+m[1]:300, li=m?+m[2]:55; return '<div class="fld"><span class="lbl">Kontur · Dicke: <b id="bwvl">'+String(bv).replace('.',',')+' px</b></span><input type="range" id="bwr" min="0" max="5" step="0.5" value="'+bv+'" class="rng" aria-label="Rahmendicke"><div class="rngl"><span>dünn</span><span>dick</span></div></div>'+'<div class="fld"><span class="lbl">Kontur · Farbe</span><div class="chips">'+[['std','Standard'],['auto','Passend zum Farbstil'],['own','Eigene Farbe']].map(function(o){ return '<button type="button" class="chip" data-a="ctcol" data-v="'+o[0]+'" aria-pressed="'+(o[0]==='own'?own:cc===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div>'+(own?'<div class="ctprev" id="ctprev" style="border-color:'+cc+'">Vorschau</div><label class="lbl">Farbton</label><input type="range" id="cthue" min="0" max="360" value="'+hu+'" class="rng hue" aria-label="Farbton"><label class="lbl">Helligkeit</label><input type="range" id="ctlig" min="10" max="90" value="'+li+'" class="rng lig" style="--h:'+hu+'" aria-label="Helligkeit">':'')+'</div>'; })()
@@ -3395,6 +3404,7 @@ document.addEventListener('click',function(e){
     case 'chatsend': sendChat(); break;
     case 'chatdel': if(S.chatOpen&&S.chatOpen!=='all'){ if(!S.chatDel){ S.chatDel=true; renderNotes(); break; } var dcid=S.chatOpen; chatMsgs(dcid).forEach(function(n){ safe(function(){ return S.store.remove('notes',n.id); }); }); safe(function(){ return S.store.remove('chats',dcid); }); S.chatOpen=''; S.chatDel=false; renderNotes(); } break;
     case 'verupd': verReload(); break;
+    case 'appupd': try{ window.fpUpdMsg=function(m){ toast(m); }; toast('Suche nach App-Update …'); window.FPNative.appUpdate(); }catch(e){} break;
     case 'verlater': S.verLater=S.newVer; verModal(); break;
     case 'delnote': safe(function(){ return S.store.remove('notes',t.dataset.id); }); break;
     case 'rcptwho': S.rcptWho=S.rcptWho===t.dataset.id?null:t.dataset.id; renderNotes(); break;
