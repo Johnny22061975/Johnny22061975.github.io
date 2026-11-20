@@ -127,7 +127,7 @@ async function main() {
       for (const d of devs) {
         const hit = j.only ? d.id === j.only : ((!j.to.length || j.to.includes(d.me)) && !(j.not && d.me === j.not));
         if (!hit || done.has(d.token)) continue; done.add(d.token);
-        const r = await fetch(`https://fcm.googleapis.com/v1/projects/${P}/messages:send`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ message: { token: d.token, data: { title: j.title, body: j.body, tag: j.tag, kind: j.kind }, webpush: { headers: { Urgency: 'high', TTL: j.kind === 'chat' ? '86400' : '3600' } } } }) });
+        const r = await fetch(`https://fcm.googleapis.com/v1/projects/${P}/messages:send`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ message: { token: d.token, data: { title: j.title, body: j.body, tag: j.tag, kind: j.kind }, android: { priority: 'high', ttl: j.kind === 'chat' ? '86400s' : '3600s' }, webpush: { headers: { Urgency: 'high', TTL: j.kind === 'chat' ? '86400' : '3600' } } } }) });
         if (r.ok) console.log('gesendet:', j.kind, '→', d.me || '?');
         else {
           const tx = await r.text(); console.log('Fehler', r.status, tx.slice(0, 200));
