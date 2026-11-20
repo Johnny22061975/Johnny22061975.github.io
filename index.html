@@ -2708,7 +2708,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='19.11.2026 · 19:28';
+var APPVER='20.11.2026 · 10:04';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2800,24 +2800,42 @@ function kasseHTML(){ var L=kVis(setList('kasse')), ym=S.kYm||ymd(new Date()).sl
       +'<div class="fld"><span class="lbl">Einträge</span>'+M.map(function(x){ var c=kcat(x.cat); return '<button type="button" class="krow" data-a="kedit" data-id="'+esc(x.id)+'"><span>'+c[1]+'</span><span><b>'+esc(x.shop||c[2])+'</b><small>'+esc(WD[weekday(x.d)]+', '+dmy(x.d)+(x.by&&PEOPLE.indexOf(x.by)>-1?' · '+pname(x.by):'')+(x.note?' · '+x.note:''))+'</small></span><b>'+eur(x.c)+'</b></button>'; }).join('')+'</div>'
       :'<p class="hint">In diesem Monat noch keine Ausgaben. Tipp auf „+ Ausgabe“ oder fotografiere einen Kassenbon.</p>'); }
 // ---------- Bon auf dem Handy lesen (Android-App, Google ML Kit) ----------
-var KSHOPS=[['rewe','REWE'],['aldi','ALDI'],['lidl','Lidl'],['edeka','EDEKA'],['netto','Netto'],['penny','Penny'],['kaufland','Kaufland'],['tegut','tegut'],['globus','Globus'],['norma','Norma'],['alnatura','Alnatura'],['denns','denn\'s'],['\\bdm\\b','dm'],['dm-drogerie','dm'],['rossmann','Rossmann'],['müller','Müller'],['aral','Aral'],['shell','Shell'],['esso','Esso'],['totalenergies','TotalEnergies'],['\\bjet\\b','JET'],['\\bomv\\b','OMV'],['agip','Agip'],['avia','Avia'],['\\bhem\\b','HEM'],['raiffeisen','Raiffeisen'],['mc ?donald','McDonald\'s'],['burger king','Burger King'],['\\bkfc\\b','KFC'],['subway','Subway'],['starbucks','Starbucks'],['backwerk','BackWerk'],['ikea','IKEA'],['obi\\b','OBI'],['bauhaus','Bauhaus'],['hornbach','Hornbach'],['toom','toom'],['action','Action'],['tedi','TEDi'],['\\bkik\\b','KiK'],['woolworth','Woolworth'],['deichmann','Deichmann'],['thalia','Thalia'],['media ?markt','MediaMarkt'],['saturn','Saturn'],['apotheke','Apotheke'],['bäckerei','Bäckerei'],['metzgerei','Metzgerei'],['fressnapf','Fressnapf'],['decathlon','Decathlon'],['h&m','H&M'],['primark','Primark'],['tchibo','Tchibo']];
+var KSHOPS=[['rewe','REWE'],['aldi','ALDI'],['lidl','Lidl'],['edeka','EDEKA'],['netto','Netto'],['penny','Penny'],['kaufland','Kaufland'],['tegut','tegut'],['globus','Globus'],['norma','Norma'],['alnatura','Alnatura'],['denns','denn\'s'],['\\bdm\\b','dm'],['dm-drogerie','dm'],['rossmann','Rossmann'],['m[üu]ller','Müller'],['aral','Aral'],['shell','Shell'],['esso','Esso'],['totalenergies','TotalEnergies'],['\\bjet\\b','JET'],['\\bomv\\b','OMV'],['agip','Agip'],['avia','Avia'],['\\bhem\\b','HEM'],['raiffeisen','Raiffeisen'],['mc ?donald','McDonald\'s'],['burger king','Burger King'],['\\bkfc\\b','KFC'],['subway','Subway'],['starbucks','Starbucks'],['backwerk','BackWerk'],['ikea','IKEA'],['obi\\b','OBI'],['bauhaus','Bauhaus'],['hornbach','Hornbach'],['toom','toom'],['action','Action'],['tedi','TEDi'],['\\bkik\\b','KiK'],['woolworth','Woolworth'],['deichmann','Deichmann'],['thalia','Thalia'],['media ?markt','MediaMarkt'],['saturn','Saturn'],['apotheke','Apotheke'],['bäckerei','Bäckerei'],['metzgerei','Metzgerei'],['fressnapf','Fressnapf'],['decathlon','Decathlon'],['h&m','H&M'],['primark','Primark'],['tchibo','Tchibo']];
 function kOcrRows(lines){ // Zeilen mit ähnlicher Höhe zu einer Bon-Zeile zusammenfügen (links Text, rechts Preis)
   var L=(lines||[]).filter(function(l){ return l&&l.t; }).map(function(l){ return {t:String(l.t),x:+l.x||0,y:+l.y||0,h:Math.max(8,+l.h||0)}; }).sort(function(a,b){ return a.y-b.y; });
   var rows=[]; L.forEach(function(l){ var c=l.y+l.h/2, row=null; for(var i=rows.length-1;i>=0&&i>=rows.length-4;i--){ if(Math.abs(rows[i].c-c)<Math.max(rows[i].h,l.h)*0.55){ row=rows[i]; break; } } if(row){ row.p.push(l); } else rows.push({c:c,h:l.h,p:[l]}); });
   return rows.map(function(r){ return r.p.sort(function(a,b){ return a.x-b.x; }).map(function(p){ return p.t; }).join('  ').replace(/\s+/g,' ').trim(); }); }
 function kOcrParse(lines){
-  var rows=kOcrRows(lines), all=rows.join('\n'), low=all.toLowerCase(), AM=/(-?\d{1,4}[,.]\d{2})(?!\d)/g;
-  var amts=function(s){ var m=String(s).match(AM)||[]; return m.map(function(x){ return cents(x.replace('.',',')); }).filter(function(n){ return isFinite(n); }); };
-  var total=null, tRow=-1;
-  [/zu zahlen|zahlbetrag|endbetrag|gesamtbetrag/i,/(^|\s)(summe|gesamt|total)(\s|$|:)/i,/girocard|ec[- ]?karte|kartenzahlung|visa|mastercard|maestro/i].some(function(re){
-    for(var i=0;i<rows.length;i++){ if(re.test(rows[i])&&!/zwischen|netto|mwst|steuer|ust|brutto ?netto|rabatt|gespart/i.test(rows[i])){ var a=amts(rows[i]); if(!a.length&&rows[i+1]) a=amts(rows[i+1]); if(a.length){ total=a[a.length-1]; tRow=i; return true; } } } return false; });
+  var rows=kOcrRows(lines), all=rows.join('\n'), AM=/(-?\d{1,4}\s?[,.]\s?\d{2})(?![\d%])/g;
+  var amts=function(s){ var m=String(s).replace(/\d{1,2}[.:]\d{2}\s?uhr/ig,'').match(AM)||[]; return m.map(function(x){ return cents(x.replace(/\s/g,'').replace('.',',')); }).filter(function(n){ return isFinite(n); }); };
+  var last=function(a){ return a.length?a[a.length-1]:null; };
+  // Kandidaten für den Gesamtbetrag sammeln; der häufigste Wert gewinnt (Lesefehler wie 19,92 statt 119,92 fallen so raus)
+  var cand=[], tRow=-1, mwst=false, itemsEnd=-1;
+  rows.forEach(function(r,i){ var l=r.toLowerCase(), a=amts(r);
+    if(/mwst|ust\.?|steuer/.test(l)&&/netto|brutto|%/.test(l)) mwst=true;
+    if(/zu (be)?zahlen|zahlbetrag|endbetrag|gesamtbetrag/.test(l)){ var v=last(a)||(rows[i+1]&&last(amts(rows[i+1]))); if(v){ cand.push([v,3]); if(tRow<0) tRow=i; } }
+    else if(/zwischensumme/.test(l)){ if(last(a)) cand.push([last(a),1]); if(itemsEnd<0) itemsEnd=i; }
+    else if(/(^|\s)(summe|gesamt|total)(\s|:|$)/.test(l)&&!/artikel|preis/.test(l)){ if(last(a)) cand.push([last(a),mwst?2:2]); if(tRow<0) tRow=i; }
+    else if(/kartenzahlung|girocard|ec[- ]?(karte|cash)|visa|mastercard|maestro|betrag eur|bar\b/.test(l)&&!/rückgeld|gegeben/.test(l)){ if(last(a)) cand.push([last(a),1]); } });
+  var score={}; cand.forEach(function(c){ if(c[0]>0) score[c[0]]=(score[c[0]]||0)+c[1]; });
+  var total=null; Object.keys(score).forEach(function(k){ if(total===null||score[k]>score[total]||(score[k]===score[total]&&+k>+total)) total=+k; });
+  if(itemsEnd<0) itemsEnd=tRow;
+  // Datum (auch mit Leerzeichen, z. B. "18. 11. 2026")
   var date='', td=ymd(new Date());
-  (all.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/g)||[]).some(function(s){ var p=s.split('.'), y=p[2].length===2?'20'+p[2]:p[2], d=y+'-'+('0'+p[1]).slice(-2)+'-'+('0'+p[0]).slice(-2); if(+p[1]>=1&&+p[1]<=12&&+p[0]>=1&&+p[0]<=31&&d<=td&&d>'2000'){ date=d; return true; } return false; });
-  var shop=''; KSHOPS.some(function(k){ if(new RegExp(k[0]).test(low)){ shop=k[1]; return true; } return false; });
-  if(!shop) rows.slice(0,5).some(function(r){ var t=r.replace(/[^A-Za-zÄÖÜäöüß&' .-]/g,'').trim(); if(t.length>=3&&!/willkommen|beleg|kassenbon|rechnung|quittung|filiale|tel|str\.|straße/i.test(t)){ shop=t.slice(0,30); return true; } return false; });
-  var items=[]; rows.slice(0,tRow>0?tRow:rows.length).forEach(function(r){ var m=r.match(/^(.*?[A-Za-zÄÖÜäöü].*?)\s+(-?\d{1,4}[,.]\d{2})\s*[A-Z*\d]{0,2}\s*$/); if(m&&!/summe|gesamt|zu zahlen|mwst|steuer|netto|brutto|gegeben|rückgeld|bar\b|karte|datum|uhrzeit|kasse|bon-nr|beleg/i.test(m[1])){ var n=m[1].replace(/\s+\d+([,.]\d+)?\s*(x|st|stk)\s*$/i,'').trim(); if(n.length>=2) items.push({n:n.slice(0,40),p:String(cents(m[2].replace('.',','))/100)}); } });
-  var cat=kFuel(shop)?'tanken':kFast(shop)?'essen':/dm|rossmann|müller/i.test(shop)?'drogerie':/apotheke/i.test(shop)?'gesundheit':/ikea|obi|bauhaus|hornbach|toom|action|tedi|woolworth/i.test(shop)?'haushalt':'lebensmittel';
-  return {shop:shop,date:date,total:total>0?(total/100).toFixed(2):'',cat:cat,items:items.slice(0,60),vat:[],text:rows.join('\n').slice(0,6000)}; }
+  (all.match(/\b(\d{1,2})\s?\.\s?(\d{1,2})\s?\.\s?(\d{4}|\d{2})\b/g)||[]).some(function(s){ var p=s.replace(/\s/g,'').split('.'), y=p[2].length===2?'20'+p[2]:p[2], d=y+'-'+('0'+p[1]).slice(-2)+'-'+('0'+p[0]).slice(-2); if(+p[1]>=1&&+p[1]<=12&&+p[0]>=1&&+p[0]<=31&&d<=td&&d>'2000'){ date=d; return true; } return false; });
+  // Geschäft: nur oben auf dem Bon suchen (unten stehen Wörter wie "Netto" in der Steuertabelle)
+  var top=rows.slice(0,6).join('\n').toLowerCase(), shop='';
+  KSHOPS.some(function(k){ if(new RegExp(k[0]).test(top)){ shop=k[1]; return true; } return false; });
+  if(!shop) rows.slice(0,5).some(function(r){ var t=r.replace(/[^A-Za-zÄÖÜäöüß&' .-]/g,'').trim(); if(t.length>=3&&!/willkommen|beleg|kassenbon|rechnung|quittung|filiale|gmbh|tel|str\.|straße/i.test(t)){ shop=t.slice(0,30); return true; } return false; });
+  // Steuer-Legende (z. B. "a: 19,00 78,95 15,00 93,95") -> Buchstabe = Satz
+  var lr={}, vat=[]; rows.forEach(function(r){ var m=r.match(/^\s*([a-dA-D1-4])\s?[:=]?\s?(19|7|0)\s?[,.]\s?0{1,2}\b/); if(m){ var a=amts(r.slice(m[0].length)); lr[m[1].toLowerCase()]=+m[2]; if(a.length>=3) vat.push({r:String(+m[2]),g:String(a[a.length-1]/100),t:String(a[a.length-2]/100)}); } });
+  var items=[]; rows.slice(0,itemsEnd>0?itemsEnd:rows.length).forEach(function(r){
+    var m=r.match(/^(.*?[A-Za-zÄÖÜäöü].*?)\s+(-?\d{1,4}\s?[,.]\s?\d{2})\s*([A-Da-d1-4*])?\s*[A-Za-z*]?\s*$/); if(!m) return;
+    var n=m[1].replace(/(\s+-?\d{1,4}[,.]\d{2}[A-Za-z]?)+\s*$/,'').replace(/^\d{1,3}\s+/,'').trim();
+    if(n.length<2||/summe|gesamt|zu (be)?zahlen|mwst|steuer|netto|brutto|gegeben|rückgeld|bar\b|karte|datum|uhrzeit|kasse|bon-nr|beleg|artikel|preis/i.test(n)||/^[a-d]\s?:/i.test(n)) return;
+    var o={n:n.slice(0,40),p:String(cents(m[2].replace(/\s/g,'').replace('.',','))/100)}; var k=(m[3]||'').toLowerCase(); if(k&&lr[k]!==undefined) o.r=String(lr[k]); items.push(o); });
+  var cat=kFuel(shop)?'tanken':kFast(shop)?'essen':/^(dm|rossmann|müller)$/i.test(shop)?'drogerie':/apotheke/i.test(shop)?'gesundheit':/ikea|obi|bauhaus|hornbach|toom|action|tedi|woolworth/i.test(shop)?'haushalt':'lebensmittel';
+  return {shop:shop,date:date,total:total>0?(total/100).toFixed(2):'',cat:cat,items:items.slice(0,60),vat:vat,text:rows.join('\n').slice(0,6000)}; }
 function kOcrNative(c){ return new Promise(function(res,rej){ if(!(window.FPNative&&window.FPNative.ocr)) return rej('kein Handy'); var id='o'+Date.now(), to=setTimeout(function(){ rej('Zeit'); },20000);
   window.fpNativeOcr=function(i,j){ if(i!==id) return; clearTimeout(to); if(j&&j.ok) res(j); else rej((j&&j.err)||'Fehler'); };
   try{ window.FPNative.ocr(id,c.toDataURL('image/jpeg',0.92).split(',')[1]); }catch(e){ clearTimeout(to); rej(String(e)); } }); }
