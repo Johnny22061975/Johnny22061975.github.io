@@ -2715,7 +2715,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='24.11.2026 · 03:19';
+var APPVER='24.11.2026 · 03:31';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2812,7 +2812,7 @@ function kasseHTML(){ var L=kVis(setList('kasse')), ym=S.kYm||ymd(new Date()).sl
     +'<div class="btns"><button type="button" class="btn pri grow" data-a="knew">+ Ausgabe</button><button type="button" class="btn" data-a="knewscan">📷 Kassenbon</button></div>'
     +(M.length?'<details class="fld" open><summary class="lbl">Nach Bereich</summary>'+bar(byC)+'</details><details class="fld"><summary class="lbl">Nach Geschäft</summary>'+bar(byS)+'</details>'+(function(){ var V={}; M.forEach(function(x){ var o=kVat(x); Object.keys(o).forEach(function(r){ V[r]=V[r]||{g:0,t:0}; V[r].g+=o[r].g; V[r].t+=o[r].t; }); }); var h=kVatHTML(V); return h?'<details class="fld"><summary class="lbl">Mehrwertsteuer</summary>'+h+'<p class="hint">Nur Bons, die per Foto ausgelesen wurden.</p></details>':''; })()
       +'<div class="fld"><span class="lbl">Einträge</span>'+M.map(function(x){ var c=kcat(x.cat); return '<button type="button" class="krow" data-a="kedit" data-id="'+esc(x.id)+'"><span>'+c[1]+'</span><span><b>'+esc(x.shop||c[2])+'</b><small>'+esc(WD[weekday(x.d)]+', '+dmy(x.d)+(x.by&&PEOPLE.indexOf(x.by)>-1?' · '+pname(x.by):'')+(x.note?' · '+x.note:''))+'</small></span><b>'+eur(x.c)+'</b></button>'; }).join('')+'</div>'
-      :'<p class="hint">In diesem Monat noch keine Ausgaben. Tipp auf „+ Ausgabe“ oder fotografiere einen Kassenbon.</p>'); }
+      :'<p class="hint">In diesem Monat noch keine Ausgaben. Tipp auf „+ Ausgabe“ oder fotografiere einen Kassenbon.</p>')+kBonLogHTML(); }
 // ---------- Bon auf dem Handy lesen (Android-App, Google ML Kit) ----------
 var KSHOPS=[['rewe','REWE'],['aldi','ALDI'],['lidl','Lidl'],['edeka','EDEKA'],['netto','Netto'],['penny','Penny'],['kaufland','Kaufland'],['tegut','tegut'],['globus','Globus'],['norma','Norma'],['alnatura','Alnatura'],['denns','denn\'s'],['\\bdm\\b','dm'],['dm-drogerie','dm'],['rossmann','Rossmann'],['m[üu]ller','Müller'],['aral','Aral'],['shell','Shell'],['esso','Esso'],['totalenergies','TotalEnergies'],['\\bjet\\b','JET'],['\\bomv\\b','OMV'],['agip','Agip'],['avia','Avia'],['\\bhem\\b','HEM'],['raiffeisen','Raiffeisen'],['mc ?donald','McDonald\'s'],['burger king','Burger King'],['\\bkfc\\b','KFC'],['subway','Subway'],['starbucks','Starbucks'],['backwerk','BackWerk'],['ikea','IKEA'],['obi\\b','OBI'],['bauhaus','Bauhaus'],['hornbach','Hornbach'],['toom','toom'],['action','Action'],['tedi','TEDi'],['\\bkik\\b','KiK'],['woolworth','Woolworth'],['deichmann','Deichmann'],['thalia','Thalia'],['media ?markt','MediaMarkt'],['saturn','Saturn'],['apotheke','Apotheke'],['bäckerei','Bäckerei'],['metzgerei','Metzgerei'],['fressnapf','Fressnapf'],['decathlon','Decathlon'],['h&m','H&M'],['primark','Primark'],['tchibo','Tchibo']];
 function kOcrRows(lines){ // Zeilen mit ähnlicher Höhe zu einer Bon-Zeile zusammenfügen (links Text, rechts Preis)
@@ -2842,7 +2842,16 @@ function kOcrParse(lines){
   KSHOPS.some(function(k){ if(new RegExp(k[0]).test(top)){ shop=k[1]; return true; } return false; });
   if(!shop) rows.slice(0,5).some(function(r){ var t=r.replace(/[^A-Za-zÄÖÜäöüß&' .-]/g,'').trim(); if(t.length>=3&&!/willkommen|beleg|kassenbon|rechnung|quittung|filiale|gmbh|tel|str\.|straße/i.test(t)){ shop=t.slice(0,30); return true; } return false; });
   // Steuer-Legende (z. B. "a: 19,00 78,95 15,00 93,95") -> Buchstabe = Satz
-  var lr={}, vat=[]; rows.forEach(function(r){ var m=r.match(/^\s*([a-dA-D1-4])\s?[:=]?\s?(19|7|0)\s?[,.]\s?0{1,2}\b/); if(m){ var a=amts(r.slice(m[0].length)); lr[m[1].toLowerCase()]=+m[2]; if(a.length>=3) vat.push({r:String(+m[2]),g:String(a[a.length-1]/100),t:String(a[a.length-2]/100)}); } });
+  // Die Spalten-Reihenfolge ist je Geschäft anders (Lidl: Steuer, Netto, Brutto; REWE: Netto, Steuer, Brutto; McDonald's oft nur die Steuer).
+  // Darum wird die Kombination gesucht, bei der Steuer = Brutto × Satz / (100 + Satz) passt; der Gesamtbetrag zählt als mögliches Brutto mit.
+  var vatFrom=function(a,r,tot){ var best=null, G=a.slice(); if(tot>0) G.push(tot);
+    G.forEach(function(g){ if(!(g>0)) return; var exp=Math.round(g*r/(100+r)); a.forEach(function(t){ if(t>0&&t<g&&Math.abs(t-exp)<=Math.max(2,Math.round(g*0.002))&&(!best||g>best.g)) best={g:g,t:t}; }); });
+    return best; };
+  var RATE=/\b(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/g;
+  var lr={}, vat=[], gotR={}; rows.forEach(function(r,i){ var l=r.toLowerCase(), m=r.match(/^\s*([a-dA-D1-4])\s?[:=]?\s?(19|7|0)\s?(?:[,.]\s?0{1,2}\s?%?|%)/), rt=null, a=[];
+    if(m){ lr[m[1].toLowerCase()]=+m[2]; rt=+m[2]; a=amts(r.slice(m[0].length)); }
+    else if(/mwst|mw\.?-?st|ust\b|u\.?st|steuer|vat/.test(l)){ var mm=r.match(/\b(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/); if(mm){ rt=+mm[1]; a=amts(r.replace(RATE,' ')); if(a.length<2&&rows[i+1]&&!/\b(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/.test(rows[i+1])) a=a.concat(amts(rows[i+1])); } }
+    if(!rt||gotR[rt]) return; var b=vatFrom(a,rt,total||0); if(b){ gotR[rt]=1; vat.push({r:String(rt),g:String(b.g/100),t:String(b.t/100)}); } });
   var items=[]; rows.slice(0,itemsEnd>0?itemsEnd:rows.length).forEach(function(r){
     var m=r.match(/^(.*?[A-Za-zÄÖÜäöü].*?)\s+(-?\d{1,4}\s?[,.]\s?\d{2})\s*([A-Da-d1-4*])?\s*[A-Za-z*]?\s*$/); if(!m) return;
     var n=m[1].replace(/(\s+-?\d{1,4}[,.]\d{2}[A-Za-z]?)+\s*$/,'').replace(/^\d{1,3}\s+/,'').trim();
@@ -2850,6 +2859,14 @@ function kOcrParse(lines){
     var o={n:n.slice(0,40),p:String(cents(m[2].replace(/\s/g,'').replace('.',','))/100)}; var k=(m[3]||'').toLowerCase(); if(k&&lr[k]!==undefined) o.r=String(lr[k]); items.push(o); });
   var cat=kFuel(shop)?'tanken':kFast(shop)?'essen':/^(dm|rossmann|müller)$/i.test(shop)?'drogerie':/apotheke/i.test(shop)?'gesundheit':/ikea|obi|bauhaus|hornbach|toom|action|tedi|woolworth/i.test(shop)?'haushalt':'lebensmittel';
   return {shop:shop,date:date,total:total>0?(total/100).toFixed(2):'',cat:cat,items:items.slice(0,60),vat:vat,text:rows.join('\n').slice(0,6000)}; }
+// Bons, bei denen keine Mehrwertsteuer gefunden wurde: gelesenen Text merken (die letzten 8), damit der Leser verbessert werden kann
+function kBonLog(loc){ try{ var f=S.kf; if(!f||!loc||!loc.text) return; if(Object.keys(kVat(f)).length) return;
+  var cur=(((S.settingsRows||{}).bonlog||{}).l)||[], e={ts:Date.now(),by:S.me||'',shop:String(f.shop||loc.shop||'').slice(0,40),d:f.date||'',amt:String(f.amt||''),tx:String(loc.text).slice(0,3000)};
+  var l=[e].concat(cur.filter(function(x){ return x&&x.tx&&x.tx!==e.tx; })).slice(0,8);
+  S.settingsRows=S.settingsRows||{}; S.settingsRows.bonlog={id:'bonlog',l:l}; saveSettings('bonlog',{l:l}); }catch(x){} }
+function kBonLogText(){ return ((((S.settingsRows||{}).bonlog||{}).l)||[]).map(function(x){ return '--- Bon: '+(x.shop||'?')+' · '+(x.d||'')+' · '+(x.amt||'')+' € ---\n'+x.tx; }).join('\n\n'); }
+function kBonLogHTML(){ var l=(((S.settingsRows||{}).bonlog||{}).l)||[]; if(!l.length) return '';
+  return '<details class="fld"><summary class="lbl">🧾 Bons ohne erkannte Steuer ('+l.length+')</summary><p class="hint">Bei diesen Bons hat die App keine Mehrwertsteuer gefunden und sich den gelesenen Text gemerkt: '+esc(l.map(function(x){ return (x.shop||'?')+(x.d?' '+dmy(x.d):''); }).join(', '))+'. Tipp auf „Kopieren“ und füg den Text im Chat mit Claude ein, dann wird der Bon-Leser verbessert.</p><div class="btns"><button type="button" class="btn sm pri" data-a="bonlogcopy">Kopieren</button><button type="button" class="btn sm" data-a="bonlogclr">Liste leeren</button></div></details>'; }
 // Browser: Texterkennung mit Tesseract (kostenlos, läuft im Browser; beim ersten Mal ca. 5 MB laden)
 var kTess=null;
 function kOcrWeb(c){ var load=kTess||(kTess=new Promise(function(res,rej){ var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; s.onload=function(){ window.Tesseract.createWorker('deu').then(res,rej); }; s.onerror=function(){ rej('laden'); }; document.head.appendChild(s); }));
@@ -2871,12 +2888,13 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
         +'Bereiche (Schlüssel = Name): '+KCAT.map(function(c){ return c[0]+' = '+c[2]; }).join(', ')+'.\n'
         +'Antworte NUR mit JSON: {"shop":"Name des Geschäfts, kurz","date":"JJJJ-MM-TT","total":"Gesamtbetrag (zu zahlen) als Zahl mit Punkt, z. B. 23.45","cat":"passender Bereich-Schlüssel","items":[{"n":"Artikel kurz","p":"Preis als Zahl","q":"Menge mit Einheit, wenn auf dem Bon zu lesen, z. B. 0,312 kg, 2 Stück, 500 g, 6x1,5 l; sonst leer lassen","r":"Mehrwertsteuersatz des Artikels in Prozent: 7 oder 19 (oder 0); ergibt sich meist aus dem Buchstaben hinter dem Preis (z. B. A/B, 1/2) und der Steuer-Legende unten auf dem Bon"}],"vat":[{"r":"Steuersatz 7 oder 19","g":"Bruttobetrag dieses Satzes","t":"enthaltene MwSt"}],"note":"kurzer Hinweis, falls etwas unleserlich war, sonst leer"}\n'
         +'Höchstens 60 Artikel. Pfand und Rabatte als eigene Zeilen mit negativem Preis. Restaurants, Fast Food und Lieferdienste gehören zum Bereich essen, Zigaretten und Tabak zum Bereich tabak, Benzin, Diesel, Öl und Autozubehör zum Bereich tanken. Erfinde nichts.';
-      var apply=function(r,okMsg){ if(S.kScan!==sc) return false; var f=S.kf; if(!f) return false;
+      var apply=function(r,okMsg,fbVat){ if(S.kScan!==sc) return false; var f=S.kf; if(!f) return false;
         var t=cents(String((r&&r.total)||'').replace('.',',')); if(!(t>0)) return false; sc.busy=false;
         f.amt=(t/100).toFixed(2).replace('.',','); if(r.shop) f.shop=String(r.shop).slice(0,40); if(/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')) f.date=r.date; if(kcat(r.cat)[0]===r.cat) f.cat=r.cat; if(kFast(f.shop)) f.cat='essen';
         var rate=function(v){ var n=parseFloat(String(v===undefined||v===null?'':v).replace(',','.')); return n===7||n===19||n===0?n:(n===5||n===16?n:null); };
         f.items=((r&&Array.isArray(r.items))?r.items:[]).slice(0,60).map(function(i){ var o={n:String((i&&i.n)||'').slice(0,40),c:cents(String((i&&i.p)||'').replace('.',','))}, rr=rate(i&&i.r), qq=String((i&&i.q)||'').replace(/\s+/g,' ').trim().slice(0,16); if(rr!==null) o.r=rr; if(qq&&!/^(null|-|0)$/i.test(qq)) o.q=qq; return o; }).filter(function(i){ return i.n&&isFinite(i.c); });
-        f.vat=((r&&Array.isArray(r.vat))?r.vat:[]).slice(0,4).map(function(v){ return {r:rate(v&&v.r),g:cents(String((v&&v.g)||'').replace('.',',')),t:cents(String((v&&v.t)||'').replace('.',','))}; }).filter(function(v){ return v.r!==null&&isFinite(v.g)&&isFinite(v.t); });
+        var cv=function(L){ return (Array.isArray(L)?L:[]).slice(0,4).map(function(v){ return {r:rate(v&&v.r),g:cents(String((v&&v.g)||'').replace('.',',')),t:cents(String((v&&v.t)||'').replace('.',','))}; }).filter(function(v){ return v.r!==null&&isFinite(v.g)&&isFinite(v.t)&&v.t>0; }); };
+        f.vat=cv(r&&r.vat); if(!f.vat.length&&fbVat) f.vat=cv(fbVat); // KI hat keine Steuer geliefert: die vom Handy gelesene behalten
         sc.err=false; sc.msg=(r.note&&String(r.note).trim())?String(r.note).trim().slice(0,160):(okMsg||'Bon erkannt. Bitte kurz prüfen und speichern.'); hhRender(); return true; };
       var viaImage=function(){
       var tmo=setTimeout(function(){ var st=''; try{ if(window.FP_AISTEP) st=' Hängt bei: '+window.FP_AISTEP()+'.'; }catch(x){} fail('Das Auslesen dauert zu lange (über 100 Sekunden).'+st); },100000);
@@ -2895,8 +2913,9 @@ function kScanRun(file){ var sc=S.kScan={busy:true,msg:''}; kGrab(); hhRender();
           Promise.race([S.sample.json(tp,{modelTier:'default',cache:false}),new Promise(function(_,rj){ setTimeout(function(){ rj('Zeit'); },45000); })]).then(function(r){
             if(S.kScan!==sc) return; sc.refine=false; var f=S.kf; if(!f) return;
             if(JSON.stringify({amt:f.amt,shop:f.shop,date:f.date})!==keep){ hhRender(); return; } // schon von Hand geändert: nichts überschreiben
-            if(!apply(r,'Bon erkannt. Bitte kurz prüfen und speichern.')){ sc.msg=src+'. Bitte kurz prüfen und speichern.'; hhRender(); }
-          },function(){ if(S.kScan!==sc) return; sc.refine=false; sc.msg=src+'. Bitte kurz prüfen und speichern (die genaue Aufteilung war gerade nicht möglich).'; hhRender(); });
+            if(!apply(r,'Bon erkannt. Bitte kurz prüfen und speichern.',loc.vat)){ sc.msg=src+'. Bitte kurz prüfen und speichern.'; hhRender(); }
+            kBonLog(loc);
+          },function(){ if(S.kScan!==sc) return; sc.refine=false; sc.msg=src+'. Bitte kurz prüfen und speichern (die genaue Aufteilung war gerade nicht möglich).'; hhRender(); kBonLog(loc); });
         },function(){ viaImage(); });
       } else viaImage(); },'image/jpeg',0.85); }; im.src=fr.result; };
   fr.readAsDataURL(file); }
@@ -3215,6 +3234,9 @@ document.addEventListener('click',function(e){
         else toast('Test hat nicht geklappt: '+String((j&&(j.msg||j.code||j.err))||'unbekannt').slice(0,140));
       }).catch(function(){ viaDb(); }); })(); break;
     case 'sacopy': saCopy(); break;
+    case 'bonlogcopy': (function(){ var tx=kBonLogText(); if(!tx) return; var fb=function(){ var ta=document.createElement('textarea'); ta.value=tx; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); var ok=false; try{ ok=document.execCommand('copy'); }catch(e){} document.body.removeChild(ta); toast(ok?'Kopiert. Jetzt im Chat mit Claude einfügen.':'Kopieren ging nicht. Bitte noch einmal versuchen.'); };
+      try{ navigator.clipboard.writeText(tx).then(function(){ toast('Kopiert. Jetzt im Chat mit Claude einfügen.'); },fb); }catch(e){ fb(); } })(); break;
+    case 'bonlogclr': S.settingsRows=S.settingsRows||{}; S.settingsRows.bonlog={id:'bonlog',l:[]}; saveSettings('bonlog',{l:[]}); hhRender(); toast('Liste geleert.'); break;
     case 'workersave': (function(){ if(!pConf('workersave')) return; var el=$('#workerIn'), u=el?String(el.value||'').trim().replace(/\/+$/,''):''; if(!/^https:\/\/[^\s\/]+\.workers\.dev$/.test(u)){ toast('Bitte die ganze Adresse einfügen, sie beginnt mit https:// und endet auf .workers.dev'); return; }
       toast('Prüfe …'); fetch(u).then(function(r){ return r.text(); }).then(function(tx){ var cfg=pushRows().pushcfg||{}; S.settingsRows=S.settingsRows||{}; S.settingsRows.pushcfg={id:'pushcfg',vapid:cfg.vapid||'',worker:u}; saveSettings('pushcfg',{vapid:cfg.vapid||'',worker:u}); toast(/ok/.test(tx)?'Verbunden ✓ Chat-Meldungen kommen jetzt sofort.':/fehlt/.test(tx)?'Gespeichert, aber bei Cloudflare fehlt noch das Secret FIREBASE_SA.':'Gespeichert, aber der Helfer antwortet noch nicht richtig. Ist der neue Code bei Cloudflare bereitgestellt?'); renderSheet(); }).catch(function(){ toast('Die Adresse ist nicht erreichbar. Bitte prüfen.'); }); })(); break;
     case 'workeroff': (function(){ if(!pConf('workeroff')) return; var cfg=pushRows().pushcfg||{}; S.settingsRows.pushcfg={id:'pushcfg',vapid:cfg.vapid||'',worker:''}; saveSettings('pushcfg',{vapid:cfg.vapid||'',worker:''}); renderSheet(); })(); break;
