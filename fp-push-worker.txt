@@ -1,0 +1,289 @@
+// Familien-Planer: schickt Chat-Nachrichten und Zettel-Meldungen sofort als Benachrichtigung (Cloudflare Worker)
+const ORIGIN = 'https://johnny22061975.github.io';
+let T = null;
+const enc = new TextEncoder();
+const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function token(sa) {
+if (T && T.exp > Date.now() + 60000) return T.t;
+const der = Uint8Array.from(atob(sa.private_key.replace(/-----[^-]+-----|\s/g, '')), c => c.charCodeAt(0));
+const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+const now = Math.floor(Date.now() / 1000);
+const un = b64u(enc.encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))) + '.' + b64u(enc.encode(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })));
+const sig = b64u(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, enc.encode(un)));
+const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + un + '.' + sig });
+const j = await r.json();
+if (!j.access_token) throw new Error('Google-Anmeldung: ' + JSON.stringify(j).slice(0, 200));
+T = { t: j.access_token, exp: Date.now() + 3300000 };
+return T.t;
+}
+const dec = v => !v ? null : 'stringValue' in v ? v.stringValue : 'integerValue' in v ? Number(v.integerValue) : 'doubleValue' in v ? v.doubleValue : 'booleanValue' in v ? v.booleanValue
+: 'arrayValue' in v ? (v.arrayValue.values || []).map(dec) : 'mapValue' in v ? Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, dec(x)])) : null;
+const obj = d => Object.assign(dec({ mapValue: { fields: d.fields || {} } }), { id: d.name.split('/').pop() });
+
+let SELF = '';
+async function tools(env) {
+const sa = JSON.parse(env.FIREBASE_SA);
+const DB = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents`;
+const H = { authorization: 'Bearer ' + await token(sa) };
+const get = async p => { const r = await fetch(`${DB}/${p}`, { headers: H }); if (r.status === 404) return null; if (!r.ok) throw new Error('Lesen ' + p + ': ' + r.status); return obj(await r.json()); };
+const list = async c => { const r = await fetch(`${DB}/${c}?pageSize=300`, { headers: H }); if (!r.ok) throw new Error('Liste ' + c + ': ' + r.status); return ((await r.json()).documents || []).map(obj); };
+const mark = (doc, field, key, val) => fetch(`${DB}/${doc}?updateMask.fieldPaths=${encodeURIComponent(field + '.`' + key + '`')}`, { method: 'PATCH', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ fields: { [field]: { mapValue: { fields: { [key]: { integerValue: String(val) } } } } } }) });
+const send = async (filter, data, ttl, perDev) => {
+const done = new Set(); let n = 0;
+for (const d of await list('push')) {
+if (!d.token || done.has(d.token) || !filter(d)) continue;
+done.add(d.token);
+const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ message: { token: d.token, data: perDev ? Object.assign({}, data, perDev(d)) : data, android: { priority: 'high' }, webpush: { headers: { Urgency: 'high', TTL: ttl } } } }) });
+if (r.ok) n++;
+else if (r.status === 404) await fetch(`${DB}/push/${d.id}`, { method: 'DELETE', headers: H });
+}
+return n;
+};
+const setRcv = async (k, ts) => { const cur = await get('settings/rcpt_' + k); if (cur && (cur.rcv || 0) >= ts) return 'schon'; await fetch(`${DB}/settings/rcpt_${k}?updateMask.fieldPaths=rcv&updateMask.fieldPaths=ack`, { method: 'PATCH', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ fields: { rcv: { integerValue: String(ts) }, ack: { integerValue: '1' } } }) }); return 'ok'; };
+return { get, mark, send, setRcv };
+}
+
+// Chat-Nachricht (notes/<id>)
+async function run(env, id) {
+const { get, mark, send } = await tools(env);
+const seenDoc = await get('pushsrv/chatseen');
+if (seenDoc && seenDoc.seen && seenDoc.seen[id]) return 'schon verschickt';
+let m = null;
+for (const w of [0, 1500, 3000, 5000]) { if (w) await new Promise(r => setTimeout(r, w)); m = await get('notes/' + id); if (m) break; }
+if (!m || typeof m.ts !== 'number' || Date.now() - m.ts > 3600000) return 'keine neue Nachricht';
+// sofort als erledigt markieren (verhindert doppelte Meldungen)
+await mark('pushsrv/chatseen', 'seen', id, m.ts);
+const cid = m.chat || 'all';
+const c = cid === 'all' ? null : await get('chats/' + cid);
+if (cid !== 'all' && !c) return 'Chat fehlt';
+const people = (await get('settings/people')) || {};
+const nm = k => (people[k] && people[k].name) || 'Jemand';
+const to = cid === 'all' ? [] : (c.members || []);
+const title = '💬 ' + nm(m.by) + (cid === 'all' ? '' : ' · ' + (c.name || 'Chat'));
+const body = String(m.text || '').slice(0, 160) || 'Neue Nachricht';
+const n = await send(d => !(m.by && d.me === m.by) && !(to.length && !to.includes(d.me)), { title, body, tag: 'chat_' + cid, kind: 'chat', mid: id, ack: SELF }, '86400', d => ({ me: String(d.me || '') }));
+return 'gesendet: ' + n;
+}
+
+// Empfangsbestätigung vom Handy (Service Worker)
+async function runAck(env, mid, me) {
+const { get, setRcv } = await tools(env);
+const m = await get('notes/' + mid);
+if (!m || typeof m.ts !== 'number') return 'Nachricht fehlt';
+return 'Empfang ' + me + ': ' + await setRcv(me, m.ts);
+}
+
+// Notiz-Zettel (citems/<id>): an die ausgewählten Personen, höchstens einmal pro halbe Stunde
+async function runNote(env, id) {
+const { get, mark, send } = await tools(env);
+const x = await get('citems/' + id);
+if (!x || (x.kind !== 'topic' && x.kind !== 'note') || typeof x.ts !== 'number' || Date.now() - x.ts > 3600000) return 'kein neuer Zettel';
+const notify = Array.isArray(x.notify) ? x.notify : [], vis = Array.isArray(x.vis) ? x.vis : [];
+const to = notify.filter(k => k !== x.by && (!vis.length || x.owner === k || vis.includes(k)));
+if (!to.length) return 'niemand zu benachrichtigen';
+const key = 'nt_' + id + '_' + Math.floor(x.ts / 1800000); // gleicher Schlüssel wie im GitHub-Ablauf, damit nichts doppelt kommt
+const st = await get('pushsrv/state');
+if (st && st.sent && st.sent[key]) return 'schon verschickt';
+await mark('pushsrv/state', 'sent', key, x.ts);
+const people = (await get('settings/people')) || {};
+const nm = k => (people[k] && people[k].name) || 'Jemand';
+const title = ('📝 ' + (x.title || (x.kind === 'note' ? 'Notiz' : 'Zettel'))).slice(0, 80);
+const body = nm(x.by) + ' hat etwas eingetragen';
+const n = await send(d => to.includes(d.me), { title, body, tag: key, kind: 'rem' }, '3600');
+return 'Zettel gesendet: ' + n;
+}
+
+
+// RMV-Abfahrten (Schlüssel liegt nur als Geheimnis RMV_KEY im Helfer, nie in der App)
+const RMV = 'https://www.rmv.de/hapi/';
+async function rmvGet(env, path, q) {
+const u = new URL(RMV + path);
+u.searchParams.set('accessId', env.RMV_KEY);
+u.searchParams.set('format', 'json');
+for (const [k, v] of Object.entries(q)) u.searchParams.set(k, String(v));
+const r = await fetch(u.toString(), { headers: { accept: 'application/json' } });
+let j = null; try { j = await r.json(); } catch (e) {}
+if (!r.ok || !j || j.errorCode) return { err: (j && j.errorCode) || ('http ' + r.status) }; // errorText nie weitergeben, er kann den Schlüssel enthalten
+return { j };
+}
+async function rmvStops(env, q) {
+const { j, err } = await rmvGet(env, 'location.name', { input: q, type: 'S', maxNo: 5 });
+if (err) return { err };
+const stops = (j.stopLocationOrCoordLocation || []).map(x => x.StopLocation).filter(Boolean).map(s => ({ id: String(s.extId || ''), name: String(s.name || '') })).filter(s => s.id);
+return { stops };
+}
+async function rmvNear(env, lat, lon) {
+const { j, err } = await rmvGet(env, 'location.nearbystops', { originCoordLat: lat, originCoordLong: lon, r: 1000, maxNo: 15, type: 'S' });
+if (err) return { err };
+const stops = (j.stopLocationOrCoordLocation || []).map(x => x.StopLocation).filter(Boolean).map(s => ({ id: String(s.extId || ''), name: String(s.name || ''), d: Math.round(+s.dist || 0), lat: +s.lat || 0, lon: +s.lon || 0 })).filter(s => s.id);
+return { stops, v: 5 };
+}
+async function rmvTrip(env, o) {
+// Ziel auflösen (Haltestelle, Ort oder Adresse), dann Verbindungen vom Standort
+const loc = await rmvGet(env, 'location.name', { input: o.q, type: 'ALL', maxNo: 6 });
+if (loc.err) return { err: loc.err };
+const hits = (loc.j.stopLocationOrCoordLocation || []).map(x => x.StopLocation || x.CoordLocation).filter(Boolean);
+const h = hits[0]; if (!h || !(+h.lat) || !(+h.lon)) return { err: 'keinziel' };
+const q = { originCoordLat: o.lat, originCoordLong: o.lon, destCoordLat: h.lat, destCoordLong: h.lon, numF: 4 };
+if (h.extId && h.id && /^A=1/.test(String(h.id))) { delete q.destCoordLat; delete q.destCoordLong; q.destId = String(h.id); }
+if (o.date) q.date = o.date; if (o.time) q.time = o.time; if (o.arr) q.searchForArrival = 1;
+const { j, err } = await rmvGet(env, 'trip', q);
+if (err) return { err };
+const hm = x => String(x || '').slice(0, 5);
+const dur = s => { const m = /PT(?:(\d+)H)?(?:(\d+)M)?/.exec(String(s || '')); return m ? (+(m[1] || 0)) * 60 + (+(m[2] || 0)) : 0; };
+const trips = (j.Trip || []).slice(0, 5).map(t => {
+let legs = t.LegList && t.LegList.Leg || []; if (!Array.isArray(legs)) legs = [legs];
+const L = legs.map(g => {
+const p = (Array.isArray(g.Product) ? g.Product[0] : g.Product) || {}, a = g.Origin || {}, z = g.Destination || {};
+const walk = g.type !== 'JNY';
+return { w: walk, line: walk ? '' : String(p.line || p.displayNumber || g.name || '').trim(), cat: walk ? '' : String(p.catOut || '').trim(), dir: String(g.direction || ''), from: String(a.name || ''), to: String(z.name || ''), t0: hm(a.rtTime || a.time), t1: hm(z.rtTime || z.time), s0: hm(a.time), tr0: String(a.rtTrack || a.track || ''), tr1: String(z.rtTrack || z.track || ''), d: Math.round(+g.dist || 0), la: +a.lat || 0, lo: +a.lon || 0, za: +z.lat || 0, zo: +z.lon || 0, m: dur(g.duration), x: g.cancelled === true || g.cancelled === 'true' };
+});
+const rides = L.filter(x => !x.w);
+return { dep: L.length ? L[0].t0 : '', arr: L.length ? L[L.length - 1].t1 : '', dur: dur(t.duration) || dur(t.calcDuration), ch: Math.max(0, rides.length - 1), legs: L };
+}).filter(t => t.legs.length);
+return { dest: { name: String(h.name || o.q), lat: +h.lat, lon: +h.lon }, trips, v: 6 };
+}
+async function rmvDeps(env, id, line, o) {
+o = o || {};
+const q = { id, duration: o.dur || 180, maxJourneys: o.date ? 120 : 60 };
+if (o.date) q.date = o.date; if (o.time) q.time = o.time;
+const { j, err } = await rmvGet(env, o.arr ? 'arrivalBoard' : 'departureBoard', q);
+if (err) return { err };
+const want = String(line || '').toUpperCase().replace(/\s+/g, ''), num = want.replace(/^AST/, ''), ast = /^AST/.test(want);
+const deps = ((o.arr ? j.Arrival : j.Departure) || []).map(d => {
+const p = (Array.isArray(d.Product) ? d.Product[0] : d.Product) || {};
+return { line: String(p.line || p.displayNumber || ''), cat: String(p.catOut || '').trim(), name: String(d.name || '').trim(), dir: String(d.direction || d.origin || ''), t: String(d.time || '').slice(0, 5), d: String(d.date || ''), rt: d.rtTime ? String(d.rtTime).slice(0, 5) : '', rd: d.rtDate ? String(d.rtDate) : '', x: d.cancelled === true || d.cancelled === 'true' };
+}).filter(d => !num || (d.line.toUpperCase() === num && ((d.cat.toUpperCase() === 'AST') === ast))).slice(0, o.date ? 60 : 8);
+return { deps, v: 4 };
+}
+
+// ---------- Zeitplan (Cloudflare Cron, jede Minute): Erinnerungen, Wecker, Müll, Test und verpasste Chats ----------
+// Ersetzt den langsamen GitHub-Zeitplan. GitHub bleibt als Reserve und springt nur ein, wenn hier 5 Minuten nichts lief.
+const fsEnc = x => x === null || x === undefined ? { nullValue: null }
+: typeof x === 'string' ? { stringValue: x }
+: typeof x === 'boolean' ? { booleanValue: x }
+: typeof x === 'number' ? (Number.isInteger(x) ? { integerValue: String(x) } : { doubleValue: x })
+: Array.isArray(x) ? { arrayValue: { values: x.map(fsEnc) } }
+: { mapValue: { fields: Object.fromEntries(Object.entries(x).map(([k, v]) => [k, fsEnc(v)])) } };
+async function cronRun(env) {
+const sa = JSON.parse(env.FIREBASE_SA);
+const P = sa.project_id, DB = `https://firestore.googleapis.com/v1/projects/${P}/databases/(default)/documents`;
+const H = { authorization: 'Bearer ' + await token(sa) };
+const now = Date.now(), LOOKAHEAD = 90000, LATE = 90 * 60000;
+const get = async p => { const r = await fetch(`${DB}/${p}`, { headers: H }); if (r.status === 404) return null; if (!r.ok) throw new Error('Lesen ' + p + ': ' + r.status); return obj(await r.json()); };
+const list = async c => { const out = []; let pt = ''; do { const r = await fetch(`${DB}/${c}?pageSize=300${pt ? '&pageToken=' + encodeURIComponent(pt) : ''}`, { headers: H }); if (!r.ok) throw new Error('Liste ' + c + ': ' + r.status); const j = await r.json(); (j.documents || []).forEach(d => out.push(obj(d))); pt = j.nextPageToken || ''; } while (pt); return out; };
+const newer = async (c, f, gt) => { const r = await fetch(`${DB}:runQuery`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: c }], where: { fieldFilter: { field: { fieldPath: f }, op: 'GREATER_THAN', value: fsEnc(gt) } } } }) }); if (!r.ok) throw new Error('Abfrage ' + c + ': ' + r.status); return (await r.json()).filter(x => x.document).map(x => obj(x.document)); };
+const put = async (p, o) => { const r = await fetch(`${DB}/${p}`, { method: 'PATCH', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ fields: fsEnc(o).mapValue.fields }) }); if (!r.ok) throw new Error('Schreiben ' + p + ': ' + r.status); };
+const st = (await get('pushsrv/state')) || {};
+const sent = st.sent || {}, seen = st.seen || {};
+const jobs = [];
+// 1) Erinnerungen und Wecker (die App legt den Plan in settings/pushplan ab)
+const plan = await get('settings/pushplan');
+for (const it of (plan && plan.items) || []) {
+if (!it || !it.k || sent[it.k] || typeof it.at !== 'number') continue;
+if (it.at <= now + LOOKAHEAD && it.at > now - LATE) { jobs.push({ to: it.to || [], title: it.t || 'Erinnerung', body: it.b || '', tag: it.k, kind: it.al ? 'alarm' : 'rem' }); sent[it.k] = it.at; }
+}
+// 2) Chat-Nachrichten, die beim sofortigen Senden verloren gingen
+if (!st.lastChat) st.lastChat = now;
+else {
+const cs = (await get('pushsrv/chatseen')) || {}, wseen = cs.seen || {};
+const msgs = (await newer('notes', 'ts', st.lastChat - 2 * 3600000)).filter(m => !seen[m.id] && typeof m.ts === 'number').sort((a, b) => a.ts - b.ts);
+if (msgs.length) {
+const people = (await get('settings/people')) || {};
+const chats = {}; for (const c of await list('chats')) chats[c.id] = c;
+const nm = k => (people[k] && people[k].name) || 'Jemand';
+for (const m of msgs) {
+if (wseen[m.id]) { seen[m.id] = m.ts; st.lastChat = Math.max(st.lastChat, m.ts); continue; }
+if (now - m.ts < 2 * 60000) continue; // ganz neue Nachrichten schickt der Sofort-Weg
+seen[m.id] = m.ts; st.lastChat = Math.max(st.lastChat, m.ts);
+if (m.ts < now - 6 * 3600000) continue;
+const cid = m.chat || 'all', c = chats[cid];
+if (cid !== 'all' && !c) continue;
+jobs.push({ to: cid === 'all' ? [] : (c.members || []), not: m.by || '', title: '💬 ' + nm(m.by) + (cid === 'all' ? '' : ' · ' + (c.name || 'Chat')), body: String(m.text || '').slice(0, 160) || 'Neue Nachricht', tag: 'chat_' + cid, kind: 'chat' });
+}
+}
+}
+// 3) Testnachricht aus der App
+const tst = await get('pushsrv/test');
+if (tst && tst.at > (st.lastTest || 0)) { st.lastTest = tst.at; if (now - tst.at < 3600000 && tst.dev) jobs.push({ only: tst.dev, title: '🔔 Test', body: 'Benachrichtigungen funktionieren.', tag: 'test', kind: 'test' }); }
+// Zuerst merken, dann senden (verhindert doppelte Meldungen, falls GitHub gleichzeitig läuft)
+for (const k of Object.keys(sent)) if (sent[k] < now - 3 * 86400000) delete sent[k];
+for (const k of Object.keys(seen)) if (seen[k] < now - 86400000) delete seen[k];
+await put('pushsrv/state', { sent, seen, lastChat: st.lastChat, lastTest: st.lastTest || 0, ts: now, cf: now });
+let n = 0;
+if (jobs.length) {
+const devs = (await list('push')).filter(d => d.token);
+for (const j of jobs) {
+const done = new Set();
+for (const d of devs) {
+const hit = j.only ? d.id === j.only : ((!j.to.length || j.to.includes(d.me)) && !(j.not && d.me === j.not));
+if (!hit || done.has(d.token)) continue; done.add(d.token);
+const r = await fetch(`https://fcm.googleapis.com/v1/projects/${P}/messages:send`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ message: { token: d.token, data: { title: j.title, body: j.body, tag: j.tag, kind: j.kind }, android: { priority: 'high', ttl: j.kind === 'chat' ? '86400s' : '3600s' }, webpush: { headers: { Urgency: 'high', TTL: j.kind === 'chat' ? '86400' : '3600' } } } }) });
+if (r.ok) n++;
+else { const tx = await r.text(); console.log('Fehler', r.status, tx.slice(0, 200)); if (r.status === 404 || /UNREGISTERED|not a valid FCM registration token/i.test(tx)) await fetch(`${DB}/push/${d.id}`, { method: 'DELETE', headers: H }); }
+}
+}
+}
+return jobs.length ? 'gesendet: ' + n : 'nichts zu schicken';
+}
+
+// Test-Knopf: schickt sofort an genau dieses Handy und sagt der App, was passiert ist
+async function runTest(env, dev) {
+const sa = JSON.parse(env.FIREBASE_SA);
+const DB = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents`;
+const H = { authorization: 'Bearer ' + await token(sa) };
+const r0 = await fetch(`${DB}/push/${dev}`, { headers: H });
+if (r0.status === 404) return { err: 'nodev' };
+if (!r0.ok) return { err: 'lesen', code: r0.status };
+const d = obj(await r0.json());
+if (!d.token) return { err: 'nodev' };
+const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ message: { token: d.token, data: { title: '🔔 Test', body: 'Benachrichtigungen funktionieren.', tag: 'test', kind: 'test' }, android: { priority: 'high', ttl: '3600s' }, webpush: { headers: { Urgency: 'high', TTL: '3600' } } } }) });
+if (r.ok) return { ok: true };
+const tx = (await r.text()).slice(0, 200);
+if (r.status === 404 || /UNREGISTERED|not a valid FCM registration token/i.test(tx)) { await fetch(`${DB}/push/${dev}`, { method: 'DELETE', headers: H }); return { err: 'nodev' }; }
+return { err: 'fcm', code: r.status, msg: 'Google antwortet ' + r.status + ': ' + tx.slice(0, 100) };
+}
+
+export default {
+async scheduled(event, env, ctx) { if (!env.FIREBASE_SA) return; ctx.waitUntil(cronRun(env).then(t => console.log(t), e => console.log('Fehler', String(e && e.message || e)))); },
+async fetch(req, env, ctx) {
+const cors = { 'access-control-allow-origin': ORIGIN, 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type' };
+if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+if (req.method === 'GET') return new Response(env.FIREBASE_SA ? 'Familien-Planer ok (Version 8 mit Zeitplan, Test-Knopf, Empfang, RMV, Fahrplan, Karte und Verbindungsauskunft' + (env.RMV_KEY ? '' : ', RMV_KEY fehlt') + ')' : 'Familien-Planer: Secret FIREBASE_SA fehlt', { headers: cors });
+SELF = new URL(req.url).origin;
+let id = '', nt = '', ack = '', me = '', b = {};
+try { b = await req.json() || {}; id = String(b.id || ''); nt = String(b.nt || ''); ack = String(b.ack || ''); me = String(b.me || ''); } catch (e) {}
+const js = o => new Response(JSON.stringify(o), { headers: { ...cors, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+if (b.rmvq !== undefined || b.rmv !== undefined || b.near !== undefined || b.trip !== undefined) {
+if (!env.RMV_KEY) return js({ err: 'nokey' });
+try {
+if (b.trip !== undefined) {
+const T = b.trip || {}, la = +T.lat, lo = +T.lon, q = String(T.q || '').trim().slice(0, 80);
+if (!(la > 45 && la < 56 && lo > 4 && lo < 17)) return js({ err: 'ort' }); if (q.length < 3) return js({ err: 'kurz' });
+const o = { q, lat: la, lon: lo };
+if (T.date !== undefined) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(T.date))) return js({ err: 'datum' }); o.date = String(T.date); }
+if (T.time !== undefined) { if (!/^\d{2}:\d{2}$/.test(String(T.time))) return js({ err: 'zeit' }); o.time = String(T.time); }
+if (T.arr) o.arr = true;
+return js(await rmvTrip(env, o));
+}
+if (b.near !== undefined) { const la = +(b.near && b.near.lat), lo = +(b.near && b.near.lon); if (!(la > 45 && la < 56 && lo > 4 && lo < 17)) return js({ err: 'ort' }); return js(await rmvNear(env, la, lo)); }
+if (b.rmvq !== undefined) { const q = String(b.rmvq || '').trim().slice(0, 80); if (q.length < 3) return js({ err: 'kurz' }); return js(await rmvStops(env, q)); }
+const sid = String(b.rmv || ''); if (!/^\d{5,9}$/.test(sid)) return js({ err: 'id' });
+const ln = String(b.line || '').trim().slice(0, 10); if (ln && !/^[0-9A-Za-z ]{1,10}$/.test(ln)) return js({ err: 'linie' });
+const o = {};
+if (b.date !== undefined) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))) return js({ err: 'datum' }); o.date = String(b.date); }
+if (b.time !== undefined) { if (!/^\d{2}:\d{2}$/.test(String(b.time))) return js({ err: 'zeit' }); o.time = String(b.time); }
+if (b.dur !== undefined) { const n = Math.round(+b.dur); if (!(n >= 10 && n <= 240)) return js({ err: 'dauer' }); o.dur = n; }
+if (b.arr) o.arr = true;
+return js(await rmvDeps(env, sid, ln, o));
+} catch (e) { return js({ err: 'netz' }); }
+}
+const ok = s => /^[A-Za-z0-9_-]{4,40}$/.test(s);
+if (b.test !== undefined) { const t = String(b.test || ''); if (!ok(t)) return js({ err: 'id' }); try { return js(await runTest(env, t)); } catch (e) { return js({ err: 'netz', msg: String(e && e.message || e).slice(0, 120) }); } }
+if (ack && ok(ack) && /^[a-z0-9]{1,14}$/.test(me)) { ctx.waitUntil(runAck(env, ack, me).then(t => console.log(t), e => console.log('Fehler', String(e && e.message || e)))); return new Response('ok', { headers: cors }); }
+if (nt && ok(nt)) { ctx.waitUntil(runNote(env, nt).then(t => console.log(t), e => console.log('Fehler', String(e && e.message || e)))); return new Response('ok', { headers: cors }); }
+if (!ok(id)) return new Response('ungültig', { status: 400, headers: cors });
+ctx.waitUntil(run(env, id).then(t => console.log(t), e => console.log('Fehler', String(e && e.message || e))));
+return new Response('ok', { headers: cors });
+}
+};

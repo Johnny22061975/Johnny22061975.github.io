@@ -2715,7 +2715,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='20.11.2026 · 17:11';
+var APPVER='24.11.2026 · 03:19';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -3204,7 +3204,16 @@ document.addEventListener('click',function(e){
     case 'vapidsave': (function(){ if(!pConf('vapidsave')) return; var el=$('#vapidIn'), v=el?String(el.value||'').replace(/\s+/g,''):''; if(v.length<60){ toast('Das sieht nicht nach dem Schlüssel aus. Bitte den ganzen langen Schlüssel einfügen.'); return; } S.settingsRows=S.settingsRows||{}; var oc=S.settingsRows.pushcfg||{}; S.settingsRows.pushcfg={id:'pushcfg',vapid:v,worker:oc.worker||''}; saveSettings('pushcfg',{vapid:v,worker:oc.worker||''}); pushEnable(true); })(); break;
     case 'pushon': pushEnable(true); break;
     case 'pushoff': (function(){ if(!pConf('pushoff')) return; var id=lsGet('pushid'); if(window.FP_PUSH) window.FP_PUSH.off(); if(id) S.store.remove('push',id); lsSet('pushid',''); lsSet('pushtok',''); toast('Benachrichtigungen auf diesem Handy aus.'); renderSheet(); })(); break;
-    case 'pushtest': S.store.set('pushsrv','test',{at:Date.now(),dev:lsGet('pushid')||''}); toast('Test angefordert. Er kommt in den nächsten 5 bis 15 Minuten. Du kannst die App dafür schließen.'); break;
+    case 'pushtest': (function(){ var dev=lsGet('pushid')||'', u=(pushRows().pushcfg||{}).worker;
+      var viaDb=function(){ S.store.set('pushsrv','test',{at:Date.now(),dev:dev}); toast('Test angefordert. Er kommt in ein bis zwei Minuten. Du kannst die App dafür schließen.'); };
+      if(!u||!dev){ viaDb(); return; }
+      toast('Test wird geschickt …');
+      fetch(u,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({test:dev})}).then(function(r){ return r.json(); }).then(function(j){
+        if(j&&j.ok) toast('Test ist raus. Die Benachrichtigung sollte in wenigen Sekunden kommen.');
+        else if(j&&j.err==='nodev'){ lsSet('pushtok',''); pushEnable(false); toast('Dieses Handy war beim Server nicht mehr angemeldet. Es ist jetzt neu angemeldet – bitte in einer Minute noch einmal „Test schicken“ tippen.'); }
+        else if(j&&j.err==='id') viaDb();
+        else toast('Test hat nicht geklappt: '+String((j&&(j.msg||j.code||j.err))||'unbekannt').slice(0,140));
+      }).catch(function(){ viaDb(); }); })(); break;
     case 'sacopy': saCopy(); break;
     case 'workersave': (function(){ if(!pConf('workersave')) return; var el=$('#workerIn'), u=el?String(el.value||'').trim().replace(/\/+$/,''):''; if(!/^https:\/\/[^\s\/]+\.workers\.dev$/.test(u)){ toast('Bitte die ganze Adresse einfügen, sie beginnt mit https:// und endet auf .workers.dev'); return; }
       toast('Prüfe …'); fetch(u).then(function(r){ return r.text(); }).then(function(tx){ var cfg=pushRows().pushcfg||{}; S.settingsRows=S.settingsRows||{}; S.settingsRows.pushcfg={id:'pushcfg',vapid:cfg.vapid||'',worker:u}; saveSettings('pushcfg',{vapid:cfg.vapid||'',worker:u}); toast(/ok/.test(tx)?'Verbunden ✓ Chat-Meldungen kommen jetzt sofort.':/fehlt/.test(tx)?'Gespeichert, aber bei Cloudflare fehlt noch das Secret FIREBASE_SA.':'Gespeichert, aber der Helfer antwortet noch nicht richtig. Ist der neue Code bei Cloudflare bereitgestellt?'); renderSheet(); }).catch(function(){ toast('Die Adresse ist nicht erreichbar. Bitte prüfen.'); }); })(); break;
@@ -3882,7 +3891,7 @@ function pushEnable(ask){ var cfg=pushRows().pushcfg||{}; if(!window.FP_PUSH||!S
   if(!S.me){ if(ask) toast('Bitte zuerst unter Menü → „Familie“ → „Wer bist du?“ auswählen, wer dieses Handy benutzt.'); return; }
   if(ask){ S.pushBusy=true; renderSheet(); }
   window.FP_PUSH.token(cfg.vapid,ask).then(function(tk){ var id=lsGet('pushid')||S.store.newId();
-      if(!lsGet('pushid')||lsGet('pushtok')!==tk||lsGet('pushme')!==S.me){ S.store.set('push',id,{token:tk,me:S.me,ts:Date.now(),ua:(window.FP_PUSH&&window.FP_PUSH.native?'Android-App · ':'')+navigator.userAgent.slice(0,120)}); lsSet('pushid',id); lsSet('pushtok',tk); lsSet('pushme',S.me); }
+      if(!lsGet('pushid')||lsGet('pushtok')!==tk||lsGet('pushme')!==S.me||Date.now()-(+lsGet('pushts')||0)>86400000){ S.store.set('push',id,{token:tk,me:S.me,ts:Date.now(),ua:(window.FP_PUSH&&window.FP_PUSH.native?'Android-App · ':'')+navigator.userAgent.slice(0,120)}); lsSet('pushid',id); lsSet('pushtok',tk); lsSet('pushme',S.me); lsSet('pushts',String(Date.now())); }
       if(ask) toast('Benachrichtigungen sind auf diesem Handy an.'); })
     .catch(function(e){ if(!ask) return; var c=e&&e.code; toast(c==='denied'?(window.FP_PUSH&&window.FP_PUSH.native?'Benachrichtigungen sind blockiert. Bitte in den Handy-Einstellungen unter Apps → Familien-Planer → Benachrichtigungen erlauben.':'Benachrichtigungen sind blockiert. Bitte in den Browser-Einstellungen für diese Seite erlauben.'):c==='unsupported'?'Dieser Browser kann keine Benachrichtigungen empfangen.':c==='noperm'?'Ohne deine Erlaubnis geht es nicht.':c==='novapid'?'Der Schlüssel fehlt noch.':'Einschalten hat nicht geklappt ('+String((e&&e.message)||c||'Fehler').slice(0,140)+').'); })
     .then(function(){ S.pushBusy=false; if(S.sheet==='settings'&&S.menuPage==='wecker') renderSheet(); }); }
