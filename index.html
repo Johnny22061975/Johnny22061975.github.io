@@ -2515,8 +2515,12 @@ function alSync(){ if(!alNat()||!S.events) return; try{ var now=Date.now(), me=S
     if(js!==S.alLast){ S.alLast=js; window.FPNative.setAlarms(js); } }catch(e){} }
 setTimeout(alSync,5000);
 window.fpAlarmCfg=function(){ try{ if(S.sheet==='settings') renderSheet(); }catch(e){} };
+// Aufklappbare Zeile direkt unter „So werde ich erinnert“ (Menü → Familie)
+function alarmRowHTML(){ if(!alNat()) return ''; if(!S.alOpen){ var nx=alCfg().next;
+    return '<button type="button" class="mrow" data-a="alopen" data-v="1" style="margin:0 0 12px"><span class="mi">⏰</span><span class="mt">Wecker-Töne &amp; Schlummern</span><span class="ms">'+(nx&&nx.at?'nächster: '+pad(new Date(nx.at).getHours())+':'+pad(new Date(nx.at).getMinutes())+' Uhr':'antippen zum Einstellen')+'</span></button>'; }
+  return nativeAlarmHTML().replace('</b>','</b><button type="button" class="linkb" data-a="alopen" data-v="" style="float:right">Zuklappen</button>'); }
 function nativeAlarmHTML(){ if(!alNat()) return ''; var c=alCfg(), cats=c.cats||{}, pm=c.perm||{}, sn=+c.snooze||5, sh=S.me&&hasShAlarm(S.me);
-  var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">📱 Wecker auf diesem Handy</b><p class="hint">Klingelt wie ein echter Wecker, auch bei geschlossener App und gesperrtem Handy. „Schlummern“ klingelt nach der eingestellten Zeit wieder, so lange, bis du „Aus“ tippst. Läuft er 5 Minuten ohne dich, schlummert er von selbst.</p>';
+  var h='<div class="panel" style="margin:0 0 12px"><b class="bpt">⏰ Wecker-Töne &amp; Schlummern</b><p class="hint">Klingelt wie ein echter Wecker, auch bei geschlossener App und gesperrtem Handy. „Schlummern“ klingelt nach der eingestellten Zeit wieder, so lange, bis du „Aus“ tippst. Läuft er 5 Minuten ohne dich, schlummert er von selbst.</p>';
   var warn=function(t,v){ return '<p class="hint err">'+t+' <button type="button" class="btn sm" data-a="alperm" data-v="'+v+'">Erlauben</button></p>'; };
   if(pm.exact===false) h+=warn('Android erlaubt der App noch keine pünktlichen Wecker.','exact');
   if(pm.fsi===false) h+=warn('Der Wecker darf sich noch nicht über den Sperrbildschirm legen.','fsi');
@@ -2765,7 +2769,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='24.11.2026 · 04:02';
+var APPVER='24.11.2026 · 08:39';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -3092,8 +3096,7 @@ function settingsSheetHTML(){
   var langBlock=pg!=='familie'?'':'<div class="fld"><span class="lbl">Sprache</span><div class="chips" data-noi18n>'+(window.FP_LANGS||[]).map(function(o){ return '<button type="button" class="chip" data-a="lang" data-v="'+o[0]+'" aria-pressed="'+(window.FP_LANG===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div><p class="hint">Gilt nur für dieses Gerät. Eigene Einträge wie Termine und Nachrichten werden nicht übersetzt.</p></div>';
   var meBlock=pg==='familie'?meBlockHTML():'';
   if(lockable) body='<div class="lockrow"><button type="button" class="btn sm'+(locked?'':' pri')+'" data-a="lookedit" data-v="'+(locked?'1':'')+'" aria-label="'+(locked?'Einstellungen ändern':'Speichern und sperren')+'">'+(locked?'Ändern':'Speichern')+'</button></div><fieldset class="lockfs"'+(locked?' disabled':'')+'>'+body+'</fieldset>';
-  if(meBlock) body=langBlock+meBlock+adminHTML()+remPrefHTML()+body;
-  if(pg==='wecker') body=nativeAlarmHTML()+body; // gilt nur für dieses Handy, darum nicht gesperrt
+  if(meBlock) body=langBlock+meBlock+adminHTML()+remPrefHTML()+alarmRowHTML()+body;
   return shHead(title)+body;
 }
 function shTop(){ var e=document.querySelector('.sheet'); if(e) e.scrollTop=0; }
@@ -3481,6 +3484,7 @@ document.addEventListener('click',function(e){
     case 'profsave': profSave(); break;
     case 'meswitch': S.meSwitch=!!t.dataset.v; renderSheet(); break;
     case 'remopen': S.remOpen=!!t.dataset.v; renderSheet(); break;
+    case 'alopen': S.alOpen=!!t.dataset.v; renderSheet(); break;
     case 'setme':
       (function(){ var ma=myAcct(), nk=t.dataset.k; if(ma&&ma.k&&ma.k!==nk&&!isAdm()){ toast('Das ist fest mit deinem Google-Konto verbunden. Ändern kann es nur ein Administrator.'); return; } if(takenBy(nk)&&!isAdm()){ toast(pname(nk)+' ist schon mit einem anderen Google-Konto verbunden.'); return; }
       S.me=nk; lsSet('me',S.me); S.meSwitch=false; S.profOpen=false; S.locPrev=undefined; if(S.fbUser&&S.fbUser.uid&&!isGenName(S.me)) acctBind(S.me); admClaim(); })(); if(!S.me) break; try{ localStorage.removeItem('fp2_lookts'); }catch(x){} setTimeout(lookRestore,0); renderNotice(); renderCal(); renderShop(); renderNotes();
