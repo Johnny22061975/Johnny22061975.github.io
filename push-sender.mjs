@@ -76,6 +76,7 @@ async function del(path) { await fetch(`${DB}/${path}`, { method: 'DELETE', head
 async function main() {
   await login();
   const st = (await get('pushsrv/state')) || {};
+  if (st.cf && now - st.cf < 5 * 60000) { console.log('Cloudflare-Zeitplan läuft (zuletzt vor ' + Math.round((now - st.cf) / 1000) + ' s) – GitHub ist nur Reserve.'); return; }
   const sent = st.sent || {}, seen = st.seen || {};
   const jobs = [];
   let changed = false;
@@ -140,7 +141,7 @@ async function main() {
   if (changed) {
     for (const k of Object.keys(sent)) if (sent[k] < now - 3 * 86400000) delete sent[k];
     for (const k of Object.keys(seen)) if (seen[k] < now - 86400000) delete seen[k];
-    await put('pushsrv/state', { sent, seen, lastChat: st.lastChat, lastTest: st.lastTest || 0, ts: now });
+    await put('pushsrv/state', { sent, seen, lastChat: st.lastChat, lastTest: st.lastTest || 0, ts: now, cf: st.cf || 0 });
   }
 }
 main().catch(e => { console.log(String(e && e.stack || e)); note('error', (e && e.message) || e); process.exit(1); });
