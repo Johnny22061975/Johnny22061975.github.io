@@ -2381,7 +2381,7 @@ function deletePlan(){
   saveSettings('plans',raw).then(function(ok){ if(ok) closeSheet(); });
 }
 function remDefault(f){ var p=remPref(S.me), who=f.who||[], c=CAT[f.cat]||CAT.sonst; return evGeneral({who:c.all?[]:who})?p.all:who.indexOf(S.me)>-1?p.own:(p.oth?'notify':'none'); }
-function moreSum(f){ var a=[]; if(f.recur&&f.recur!=='none') a.push('🔁 '+(RECUR[f.recur]||'')); if(f.remind) a.push('🔔 '+(REMIND[f.remind]||'')); if(f.emo) a.push(f.emo); return a.join(' · '); }
+function moreSum(f){ var a=[]; if(f.recur&&f.recur!=='none') a.push('🔁 '+(RECUR[f.recur]||'')); if(f.remind) a.push('🔔 '+(REMIND[f.remind]||'')); return a.join(' · '); }
 function eventViewHTML(){ var f=S.form, c=CAT[f.cat]||CAT.sonst, ev=S.events.filter(function(x){ return x.id===f.id; })[0]||{}, row=function(l,v){ return v?'<div class="tabrow" style="gap:10px;align-items:flex-start"><span style="flex:0 0 96px;color:var(--ink-2);font-size:14px">'+l+'</span><span style="min-width:0;flex:1">'+v+'</span></div>':''; };
   var dt=WD[weekday(f.occ||f.date)]+', '+dmy(f.occ||f.date)+(f.endDate&&f.recur==='none'?' bis '+WD[weekday(f.endDate)]+', '+dmy(f.endDate):'');
   var tm=f.start?(f.start+(f.end?' – '+f.end:'')+' Uhr'):'ganztägig';
@@ -2421,13 +2421,12 @@ function eventSheetHTML(){
     +'<div class="fld"><label class="lbl" for="f-title">Titel</label>'
     +'<div class="tin"><input type="text" id="f-title" data-f="title" value="'+esc(f.title)+'" maxlength="160" placeholder="Eintippen oder unten wählen" autocomplete="off"></div>'
     +(S.sample?'<div class="aibar"><button type="button" class="btn sm" data-a="titlequick"'+(f.busy?' disabled':'')+'>'+(f.busy?'Moment …':'✨ Satz auswerten und ausfüllen')+'</button><p class="hint '+esc(f.hintKind)+'">'+(f.hint?esc(f.hint):'Tipp: Schreib oder sprich einen ganzen Satz in den Titel, zum Beispiel „Freitag 7 bis 16 Uhr Frühdienst“, und tippe dann hier.')+'</p></div>':'')
-    +'<div class="sugg" id="sugg">'+suggHTML()+'</div></div>'
+    +'<div class="sugg" id="sugg">'+suggHTML()+'</div><div id="emoBox">'+emoHTML()+'</div></div>'
     +'<div class="fld"><span class="lbl">Datum</span>'+dateSelects('f:date',f.date)+'</div>'+(f.recur==='none'?second:'')
     +'<div class="row2" id="timeBox">'+timeHTML()+'</div>'
     +(Array.isArray(f.lessons)?'<div class="fld"><span class="lbl">Stunden</span><div class="lsbox">'+lessonsEditHTML(f.lessons,'form',0)+'</div><p class="hint">Uhrzeit, Fach und Lehrer kannst du hier ändern. '+(f.scope==='one'?'Gilt nur für diesen Tag, z. B. bei Vertretung.':'Gilt für jede Woche.')+'</p></div>':'')
     +'<button type="button" class="btn grow evmore" data-a="evmore" aria-expanded="'+(!!f.more)+'" style="width:100%;justify-content:space-between;margin:4px 0 12px"><span>'+(f.more?'▴ Weniger Optionen':'▾ Mehr Optionen')+'</span><small style="color:var(--ink-2);font-weight:400">'+esc(moreSum(f))+'</small></button>'
     +(f.more?'<div class="panel evmorebox" style="margin:0 0 12px">'
-    +'<div class="fld"><span class="lbl">Symbol</span><div id="emoBox">'+emoHTML()+'</div></div>'
     +(f.scope==='one'?'':'<div class="fld"><label class="lbl" for="f-recur">Wiederholen</label><select id="f-recur" data-f="recur">'+opt(RECUR,f.recur)+'</select>'+'</div>')+(f.recur!=='none'?second:'')
     +(c.all?'':'<div class="fld"><span class="lbl">Im Monat sichtbar für</span><div class="seg segtop" role="group"><button type="button" data-a="evvis" data-v="all" aria-pressed="'+(formVis(f)==='all')+'">Alle</button><button type="button" data-a="evvis" data-v="own" aria-pressed="'+(formVis(f)!=='all')+'">Nur '+esc((f.who||[]).map(pname).join(', ')||'ausgewählte Personen')+'</button></div><p class="hint">'+(formVis(f)==='all'?'Steht für alle immer in der Monatsübersicht, z. B. Familienurlaub.':'Steht in der Monatsübersicht nur, wenn die Person oben angetippt ist. Beim Antippen des Tages sieht man ihn immer.')+'</p></div>')
     +'<div class="fld"><label class="lbl" for="f-remind">Erinnerung</label><div class="brem" style="gap:8px"><select id="f-remind" data-f="remind" style="flex:1 1 150px">'+opt(REMIND,f.remind)+'</select>'
@@ -2799,7 +2798,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='25.11.2026 · 01:10';
+var APPVER='25.11.2026 · 01:20';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
