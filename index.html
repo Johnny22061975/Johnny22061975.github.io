@@ -757,7 +757,7 @@ function pname(k){ return (S.people[k]&&S.people[k].name)||k; }
 function activePeople(){ var a=PEOPLE.filter(function(k){ return S.people[k].active; }); if(!a.length) return [PEOPLE[0]]; if(S.me&&a.indexOf(S.me)>0){ a=[S.me].concat(a.filter(function(k){ return k!==S.me; })); } return a; }
 function findRow(rows,id){ var r=null; rows.forEach(function(x){ if(x.id===id) r=x; }); return r; }
 function applySettings(rows){
-  S.settingsRows={}; rows.forEach(function(r){ S.settingsRows[r.id]=r; }); S.settingsReady=true; meAuto(); setTimeout(function(){ meAuto(); locWatch(); chatPurge(); },0);
+  S.settingsRows={}; rows.forEach(function(r){ S.settingsRows[r.id]=r; }); S.settingsReady=true; meAuto(); setTimeout(function(){ meAuto(); locWatch(); chatPurge(); devReport(); },0);
   setTimeout(function(){ if(S.me&&!(S.settingsRows||{})['look_'+S.me]&&S.fbUser) lookBackup(); else lookRestore(); },0);
   var scl=findRow(rows,'schoolcal'); S.schoolCal=(scl&&scl.m&&typeof scl.m==='object')?scl.m:{};
   var rof=findRow(rows,'roworder'); S.rowOrd=(rof&&rof.p&&typeof rof.p==='object')?rof.p:{};
@@ -2495,6 +2495,10 @@ function isAdm(k){ return admList().indexOf(k||S.me)>-1; }
 function admClaim(){ if(!S.me||isGenName(S.me)||!S.fbUser||S.admClaimed) return; if(admList().length) return; S.admClaimed=true; // wer zuerst da ist, ist Administrator
   S.settingsRows.admins={id:'admins',k:[S.me],ts:Date.now()}; saveSettings('admins',{k:[S.me],ts:Date.now(),by:S.me}); }
 function mePickable(){ return activePeople().filter(function(k){ return !isGenName(k)&&(!takenBy(k)||isAdm()); }); }
+function devReport(){ if(!S.me||isGenName(S.me)||!S.fbUser||!S.settingsReady) return; var bg='web', av=0;
+  try{ if(window.FPNative&&window.FPNative.bgLoc) bg=String(window.FPNative.bgLoc()); if(window.FPNative&&window.FPNative.appVersion) av=+window.FPNative.appVersion()||0; }catch(e){}
+  var r=(S.settingsRows||{})['dev_'+S.me]||{}; if(r.bg===bg&&r.av===av&&Date.now()-(r.ts||0)<6*3600000) return;
+  var o={bg:bg,av:av,ts:Date.now()}; S.settingsRows['dev_'+S.me]=Object.assign({id:'dev_'+S.me},o); saveSettings('dev_'+S.me,o); }
 function chatPurge(){ if(!S.store||!S.me||!isAdm()||!S.chatRaw) return; ['notes','chats'].forEach(function(c){ (S.chatRaw[c]||[]).forEach(function(r){ try{ S.store.remove(c,r.id); }catch(e){} }); S.chatRaw[c]=[]; }); }
 function locWatch(){ if(!S.me) return; var r=locRow(S.me), on=!!(r&&r.on); if(S.locPrev===undefined){ S.locPrev=on; return; } if(on===S.locPrev) return; S.locPrev=on;
   try{ locInit(); mapShareUI(); mapFamUI(); }catch(e){}
@@ -2503,8 +2507,8 @@ function adminHTML(){ if(!S.me||!isAdm()) return ''; var ppl=activePeople().filt
   var h='<div class="panel" style="margin:12px 0"><b class="bpt">🛡️ Verwaltung</b><p class="hint">Nur Administratoren sehen diesen Bereich.</p>';
   h+='<div class="fld"><span class="lbl">Administratoren</span>'+ppl.map(function(k){ return '<label class="cb" style="display:flex;gap:10px;align-items:center;margin:4px 0"><input type="checkbox" data-admset="'+k+'"'+(adm.indexOf(k)>-1?' checked':'')+' style="width:22px;height:22px"><span style="color:var(--p-'+k+');font-weight:700">'+esc(pname(k))+'</span></label>'; }).join('')
     +'<p class="hint">Administratoren ordnen die Google-Konten zu, bestimmen weitere Administratoren und schalten die Sichtbarkeit auf der Karte für alle ein und aus. Einer bleibt immer.</p></div>';
-  h+='<div class="fld"><span class="lbl">📍 Auf der Karte sichtbar</span>'+ppl.map(function(k){ var r=locRow(k), on=!!(r&&r.on); return '<div class="tabrow" style="gap:8px"><span style="min-width:0;color:var(--p-'+k+');font-weight:700">'+esc(pname(k))+'</span><span style="flex:0 0 auto;color:var(--ink-2);font-size:13px">'+(on?(r.lat!==undefined&&r.ts?locAgo(r.ts):'an'):'aus')+'</span><input type="checkbox" data-admvis="'+k+'"'+(on?' checked':'')+' aria-label="'+esc(pname(k))+' sichtbar"></div>'; }).join('')
-    +'<p class="hint">Die Person sieht auf ihrem Handy, ob sie sichtbar ist, und bekommt eine Meldung. Ist ihre App gerade zu, startet das Teilen, sobald das Handy es erlaubt, sonst beim nächsten Öffnen.</p></div>';
+  h+='<div class="fld"><span class="lbl">📍 Auf der Karte sichtbar</span>'+ppl.map(function(k){ var r=locRow(k), on=!!(r&&r.on); return '<div class="tabrow" style="gap:8px"><span style="min-width:0;color:var(--p-'+k+');font-weight:700">'+esc(pname(k))+'</span><span style="flex:0 0 auto;color:var(--ink-2);font-size:13px">'+(on?(r.lat!==undefined&&r.ts?locAgo(r.ts):'an'):'aus')+(function(){ var d=(S.settingsRows||{})['dev_'+k]; if(!d) return ' · App?'; return d.bg==='ok'?' · Immer ✓':d.bg==='web'?' · nur Browser':' · Immer ✗'; })()+'</span><input type="checkbox" data-admvis="'+k+'"'+(on?' checked':'')+' aria-label="'+esc(pname(k))+' sichtbar"></div>'; }).join('')
+    +'<p class="hint">„Immer ✓“ heißt: Das Teilen startet auch bei geschlossener App. Bei „Immer ✗“ muss die Person einmal in ihrer App unter Menü → Familie auf „Standort Immer erlauben“ tippen. Die Person sieht auf ihrem Handy, ob sie sichtbar ist, und bekommt eine Meldung. Ist ihre App gerade zu, startet das Teilen, sobald das Handy es erlaubt, sonst beim nächsten Öffnen.</p></div>';
   h+='<div class="fld"><span class="lbl">Google-Konten</span>'+(acc.length?acc.map(function(a){ return '<div class="tabrow" style="gap:8px"><span style="min-width:0;overflow-wrap:anywhere;font-size:14px">'+esc(a.mail||a.nm||('Konto …'+a.uid.slice(-4)))+'</span><select data-admacct="'+esc(a.uid)+'" style="width:auto"><option value="">– niemand –</option>'+ppl.map(function(k){ return '<option value="'+k+'"'+(a.k===k?' selected':'')+'>'+esc(pname(k))+'</option>'; }).join('')+'</select></div>'; }).join(''):'<p class="hint">Noch keine Konten.</p>')
     +'<p class="hint">Wer sich zum ersten Mal mit Google anmeldet, wählt einmal aus, wer er ist. Danach ist das fest. Hier kannst du es ändern; „niemand“ lässt die Person beim nächsten Öffnen neu wählen.</p></div>';
   return h+'</div>'; }
@@ -2798,7 +2802,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='25.11.2026 · 17:40';
+var APPVER='25.11.2026 · 18:52';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -3670,7 +3674,9 @@ document.addEventListener('change',function(e){
   if(e.target&&e.target.dataset&&e.target.dataset.admset){ if(!isAdm()) return; var ak=e.target.dataset.admset, AL=admList().filter(function(x){ return x!==ak; }); if(e.target.checked) AL.push(ak); if(!AL.length){ toast('Mindestens ein Administrator muss bleiben.'); renderSheet(); return; } S.settingsRows.admins={id:'admins',k:AL,ts:Date.now()}; saveSettings('admins',{k:AL,ts:Date.now(),by:S.me}); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.admacct){ if(!isAdm()) return; var au=e.target.dataset.admacct, old=(S.settingsRows||{})['acct_'+au]||{}, ao={k:e.target.value||'',mail:old.mail||'',nm:old.nm||'',ts:Date.now(),by:S.me}; S.settingsRows['acct_'+au]=Object.assign({id:'acct_'+au},ao); saveSettings('acct_'+au,ao); meAuto(); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.admvis){ if(!isAdm()) return; var vk=e.target.dataset.admvis, von=!!e.target.checked, vo=Object.assign({},locRow(vk)||{}); delete vo.id; vo.on=von; vo.adm=S.me; vo.ats=Date.now(); vo.ts=vo.ts||Date.now(); if(!von){ delete vo.lat; delete vo.lon; delete vo.acc; }
-    S.settingsRows['loc_'+vk]=Object.assign({id:'loc_'+vk},vo); saveSettings('loc_'+vk,vo); setTimeout(function(){ var u=(pushRows().pushcfg||{}).worker; if(u&&vk!==S.me) try{ fetch(u,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({loc:vk})}).catch(function(){}); }catch(x){} },3000);
+    S.settingsRows['loc_'+vk]=Object.assign({id:'loc_'+vk},vo); saveSettings('loc_'+vk,vo); setTimeout(function(){ var u=(pushRows().pushcfg||{}).worker; if(u&&vk!==S.me) try{ fetch(u,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({loc:vk})}).then(function(r){ return r.json(); }).then(function(j){
+      if(j&&j.ok) toast(j.n?('📍 Handy von '+pname(vk)+' wurde benachrichtigt.'):('📍 '+pname(vk)+' hat kein Handy für Meldungen angemeldet. Das Teilen startet erst, wenn die App geöffnet wird.'));
+      else toast('📍 Meldung an '+pname(vk)+' ging nicht raus ('+((j&&j.err)||'?')+').'); }).catch(function(){ toast('📍 Meldung an '+pname(vk)+' ging nicht raus (keine Verbindung zum Helfer).'); }); }catch(x){} },3000);
     if(vk===S.me){ S.locPrev=von; locInit(); mapShareUI(); } toast(pname(vk)+(von?' ist jetzt auf der Karte sichtbar.':' ist jetzt unsichtbar.')); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.rem&&S.me&&S.people[S.me]){ var rk=e.target.dataset.rem, rp=remPref(S.me); if(rk==='oth') rp.oth=!!e.target.checked; else rp[rk]=e.target.value; S.people[S.me].rem=remClean(rp); savePeople(); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.f2&&S.form){ S.form[e.target.dataset.f2]=!!e.target.checked; return; }
