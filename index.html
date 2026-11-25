@@ -2798,7 +2798,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='25.11.2026 · 17:18';
+var APPVER='25.11.2026 · 17:40';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -2903,7 +2903,8 @@ function kOcrRows(lines){ // Zeilen mit ähnlicher Höhe zu einer Bon-Zeile zusa
   var rows=[]; L.forEach(function(l){ var c=l.y+l.h/2, row=null; for(var i=rows.length-1;i>=0&&i>=rows.length-4;i--){ if(Math.abs(rows[i].c-c)<Math.max(rows[i].h,l.h)*0.55){ row=rows[i]; break; } } if(row){ row.p.push(l); } else rows.push({c:c,h:l.h,p:[l]}); });
   return rows.map(function(r){ return r.p.sort(function(a,b){ return a.x-b.x; }).map(function(p){ return p.t; }).join('  ').replace(/\s+/g,' ').trim(); }); }
 function kOcrParse(lines){
-  var rows=kOcrRows(lines), all=rows.join('\n'), AM=/(-?\d{1,4}\s?[,.]\s?\d{2})(?![\d%])/g;
+  // gesperrt gedruckte Wörter wie „S u m m e“ (Aldi) wieder zusammenziehen
+  var rows=kOcrRows(lines).map(function(r){ return String(r).replace(/(^|\s)((?:[A-Za-zÄÖÜäöü] ){2,}[A-Za-zÄÖÜäöü])(?=\s|$)/g,function(m,a,w){ return a+w.replace(/ /g,''); }); }), all=rows.join('\n'), AM=/(-?\d{1,4}\s?[,.]\s?\d{2})(?![\d%])/g;
   var amts=function(s){ var m=String(s).replace(/\d{1,2}[.:]\d{2}\s?uhr/ig,'').match(AM)||[]; return m.map(function(x){ return cents(x.replace(/\s/g,'').replace('.',',')); }).filter(function(n){ return isFinite(n); }); };
   var last=function(a){ return a.length?a[a.length-1]:null; };
   // Kandidaten für den Gesamtbetrag sammeln; der häufigste Wert gewinnt (Lesefehler wie 19,92 statt 119,92 fallen so raus)
@@ -2930,10 +2931,10 @@ function kOcrParse(lines){
   var vatFrom=function(a,r,tot){ var best=null, G=a.slice(); if(tot>0) G.push(tot);
     G.forEach(function(g){ if(!(g>0)) return; var exp=Math.round(g*r/(100+r)); a.forEach(function(t){ if(t>0&&t<g&&Math.abs(t-exp)<=Math.max(2,Math.round(g*0.002))&&(!best||g>best.g)) best={g:g,t:t}; }); });
     return best; };
-  var RATE=/\b(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/g;
-  var lr={}, vat=[], gotR={}; rows.forEach(function(r,i){ var l=r.toLowerCase(), m=r.match(/^\s*([a-dA-D1-4])\s?[:=]?\s?(19|7|0)\s?(?:[,.]\s?0{1,2}\s?%?|%)/), rt=null, a=[];
+  var RATE=/\b0?(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/g;
+  var lr={}, vat=[], gotR={}; rows.forEach(function(r,i){ var l=r.toLowerCase(), m=r.match(/^\s*([a-dA-D1-4])\s?[:=]?\s?0?(19|7|0)\s?(?:[,.]\s?0{1,2}\s?%?|%)/), rt=null, a=[];
     if(m){ lr[m[1].toLowerCase()]=+m[2]; rt=+m[2]; a=amts(r.slice(m[0].length)); }
-    else if(/mwst|mw\.?-?st|ust\b|u\.?st|steuer|vat/.test(l)){ var mm=r.match(/\b(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/); if(mm){ rt=+mm[1]; a=amts(r.replace(RATE,' ')); if(a.length<2&&rows[i+1]&&!/\b(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/.test(rows[i+1])) a=a.concat(amts(rows[i+1])); } }
+    else if(/mwst|mw\.?-?st|ust\b|u\.?st|steuer|vat/.test(l)){ var mm=r.match(/\b0?(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/); if(mm){ rt=+mm[1]; a=amts(r.replace(RATE,' ')); if(a.length<2&&rows[i+1]&&!/\b0?(19|7)\s?(?:[,.]\s?0{1,2}\s?%?|%)/.test(rows[i+1])) a=a.concat(amts(rows[i+1])); } }
     if(!rt||gotR[rt]) return; var b=vatFrom(a,rt,total||0); if(b){ gotR[rt]=1; vat.push({r:String(rt),g:String(b.g/100),t:String(b.t/100)}); } });
   var items=[]; rows.slice(0,itemsEnd>0?itemsEnd:rows.length).forEach(function(r){
     var m=r.match(/^(.*?[A-Za-zÄÖÜäöü].*?)\s+(-?\d{1,4}\s?[,.]\s?\d{2})\s*([A-Da-d1-4*])?\s*[A-Za-z*]?\s*$/); if(!m) return;
