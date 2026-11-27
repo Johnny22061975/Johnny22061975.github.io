@@ -22,6 +22,8 @@
   document.addEventListener('DOMContentLoaded',function(){ swap(document.body); }); if(document.body) swap(document.body);
 })();
 </script>
+<style>#mapCanvas.maplocked,#mapCanvas.maplocked *{touch-action:pan-y!important}#mapCanvas{position:relative}#mapCanvas.maplocked::after{content:'Tippen, um die Karte zu bewegen';position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:900;background:rgba(0,0,0,.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:14px;pointer-events:none;white-space:nowrap}
+</style>
 </head><body>
 <title>Familien-Planer</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -1676,8 +1678,16 @@ function renderMap(){ var box=$('#mapBox'); if(!box) return; if(!box.firstChild)
   mapShareUI(); mapFamUI(); mapStopsUI(); mapStatus(); locStart();
   if(MAPV.map){ setTimeout(function(){ try{ MAPV.map.invalidateSize(); mapDraw(); }catch(e){} },80); return; }
   mapLib().then(function(){ if(MAPV.map||!$('#mapCanvas')) return; MAPV.map=L.map('mapCanvas',{zoomControl:true,attributionControl:false}).setView([50.336,8.536],13);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(MAPV.map); MAPV.follow='me'; MAPV.map.on('dragstart',function(){ if(MAPV.follow){ MAPV.follow=null; mapStatus(); } }); mapDraw(); mapStatus(); setTimeout(function(){ try{ MAPV.map.invalidateSize(); }catch(e){} },200); },
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(MAPV.map); MAPV.follow='me'; MAPV.map.on('dragstart',function(){ if(MAPV.follow){ MAPV.follow=null; mapStatus(); } }); mapDraw(); mapStatus(); mapLock(true); setTimeout(function(){ try{ MAPV.map.invalidateSize(); }catch(e){} },200); },
     function(){ MAPV.err='Die Karte konnte nicht geladen werden. Prüf die Internetverbindung.'; mapStatus(); }); }
+// Karte ist erst starr (Seite lässt sich darüber scrollen); ein Tipp schaltet sie frei, ein Tipp außerhalb sperrt sie wieder
+function mapLock(on){ var m=MAPV.map, el=$('#mapCanvas'); if(!m||!el) return; MAPV.locked=on;
+  ['dragging','touchZoom','doubleClickZoom','scrollWheelZoom','boxZoom','keyboard'].forEach(function(h){ try{ if(m[h]) m[h][on?'disable':'enable'](); }catch(e){} });
+  if(m.tap) try{ m.tap[on?'disable':'enable'](); }catch(e){}
+  el.classList.toggle('maplocked',on); }
+document.addEventListener('click',function(e){ if(!MAPV.map) return; var el=$('#mapCanvas'); if(!el) return; var inside=el.contains(e.target);
+  if(inside&&MAPV.locked){ if(e.target.closest&&e.target.closest('.leaflet-control')) return; mapLock(false); }
+  else if(!inside&&!MAPV.locked) mapLock(true); },true);
 /* ---------- Wetter (Open-Meteo, ohne Schlüssel; Ort fest Usingen) ---------- */
 var WX={d:null,cv:null,raf:0,kind:'',t0:0,ps:[],last:0};
 function wxKind(c,day){ c=+c; if(c===0||c===1) return day?'sun':'clear'; if(c===2) return day?'part':'clear'; if(c===3) return 'cloud'; if(c===45||c===48) return 'fog'; if(c>=51&&c<=57) return 'rain'; if(c>=61&&c<=67) return 'rain'; if(c>=80&&c<=82) return 'rain'; if((c>=71&&c<=77)||c===85||c===86) return 'snow'; if(c>=95) return 'storm'; return 'cloud'; }
@@ -2803,7 +2813,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='27.11.2026 · 17:36';
+var APPVER='27.11.2026 · 20:15';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
