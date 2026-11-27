@@ -12,7 +12,7 @@
   function swap(root){ if(!root) return; var list=[];
     if(root.nodeType===3){ if(RX.test(root.nodeValue)) list.push(root); }
     else if(root.nodeType===1){ var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null), t; while((t=w.nextNode())) if(RX.test(t.nodeValue)) list.push(t); }
-    list.forEach(function(t){ if(!t.parentNode||!ok(t)) return; var parts=t.nodeValue.split(RXG), f=document.createDocumentFragment();
+    list.forEach(function(t){ if(!t.parentNode||!ok(t)) return; var parts=t.nodeValue.split(RXG), f=document.createElement('span');
       parts.forEach(function(x){ if(!x) return; var u=EMO[x]; if(u){ var im=document.createElement('img'); im.src=u; im.alt=x; im.className='emo'; im.draggable=false; f.appendChild(im); } else f.appendChild(document.createTextNode(x)); });
       t.parentNode.replaceChild(f,t); }); }
   var q=[], sch=false;
@@ -304,7 +304,7 @@ textarea{resize:vertical}
 .q-row{display:flex;gap:8px}
 .q-row input{flex:1}
 .scrim{position:fixed;inset:0;background:rgba(10,14,22,.5);display:flex;align-items:flex-end;justify-content:center;z-index:50}
-.sheet{width:min(680px,100%);max-height:94%;overflow:auto;background:var(--surface);background-image:var(--sheetbg,none);color:var(--ink);border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:16px;outline:0}
+.sheet{width:min(680px,100%);max-height:94%;overflow:auto;overflow-x:hidden;background:var(--surface);background-image:var(--sheetbg,none);color:var(--ink);border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:16px;outline:0}
 .sh-h{display:flex;align-items:center;justify-content:space-between;gap:12px}.shr{display:flex;align-items:center;gap:8px;flex:none}.shtm{margin-top:8px}.wait{display:grid;justify-items:center;text-align:center;gap:14px;padding:34px 18px;border:2px solid var(--ink);border-radius:16px;background:var(--surface)}.wait b{font:700 20px/1.25 var(--f-display)}.wait p{margin:0;color:var(--ink-2);font-size:15px}.spin{width:54px;height:54px;border-radius:50%;border:5px solid color-mix(in srgb,var(--ink) 18%,transparent);border-top-color:var(--ink);animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
 .sh-h h2{margin:0;font:700 22px/1.1 var(--f-display);letter-spacing:-.01em}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
@@ -1612,7 +1612,7 @@ function mapStatus(){ var el=$('#mapStatus'); if(!el) return; el.textContent=MAP
 function mapPeople(){ return activePeople().filter(function(k){ return !isGenName(k); }); }
 function mapFamUI(){ var el=$('#mapFam'); if(!el) return; var rows=mapPeople().map(function(k){ var r=locRow(k), me=k===S.me, has=r&&r.on&&r.lat!==undefined, st=me?(locOn()?'teilt (du)':'teilt nicht (du)'):!r||!r.on?'teilt nicht':!has?'noch keine Position':locAgo(r.ts);
     var pos=me?MAPV.me:(has?r:null);
-    return '<div class="mfam"><span class="mdot" style="background:var(--p-'+k+')"></span><span><b>'+esc(pname(k))+'</b><small>'+esc(st)+'</small></span>'+(pos?'<button type="button" class="btn sm" data-a="mapfocus" data-k="'+k+'">Zeigen</button>'+(me?'':'<a class="btn sm" href="'+mapRoute(pos.lat,pos.lon)+'" target="_blank" rel="noopener">🧭 Route</a>'):'')+'</div>'; }).join('');
+    return '<div class="mfam"><span class="mdot" style="background:var(--p-'+k+')"></span><span><b>'+esc(pname(k))+'</b><small>'+esc(st)+'</small></span>'+(!me&&isAdm()?'<label style="display:flex;align-items:center;gap:4px;font-size:12px;flex:0 0 auto">Sichtbar<input type="checkbox" data-admvis="'+k+'"'+(r&&r.on?' checked':'')+' style="width:22px;height:22px"></label>':'')+(pos?'<button type="button" class="btn sm" data-a="mapfocus" data-k="'+k+'">Zeigen</button>'+(me?'':'<a class="btn sm" href="'+mapRoute(pos.lat,pos.lon)+'" target="_blank" rel="noopener">🧭 Route</a>'):'')+'</div>'; }).join('');
   el.innerHTML='<div class="fld"><span class="lbl">Familie</span>'+rows+'</div>'; }
 function mapIcon(k){ var n=String(pname(k)||'?').charAt(0).toUpperCase(); return L.divIcon({className:'mpin',html:'<span style="--pc:var(--p-'+k+')">'+esc(n)+'</span>',iconSize:[30,30],iconAnchor:[15,15]}); }
 function mapDraw(){ if(!MAPV.map||!window.L) return; var pts=[];
@@ -2504,7 +2504,8 @@ function locWatch(){ if(!S.me) return; var r=locRow(S.me), on=!!(r&&r.on); if(S.
   try{ locInit(); mapShareUI(); mapFamUI(); }catch(e){}
   if(r&&r.adm&&r.adm!==S.me&&Date.now()-(r.ats||0)<10*60000) toast(pname(r.adm)+' hat dein Teilen auf der Karte '+(on?'eingeschaltet':'ausgeschaltet')+'.'); }
 function adminHTML(){ if(!S.me||!isAdm()) return ''; var ppl=activePeople().filter(function(k){ return !isGenName(k); }), acc=acctRows(), adm=admList();
-  var h='<div class="panel" style="margin:12px 0"><b class="bpt">🛡️ Verwaltung</b><p class="hint">Nur Administratoren sehen diesen Bereich.</p>';
+  if(!S.admOpen) return '<button type="button" class="mrow" data-a="admopen" data-v="1" style="margin:12px 0"><span class="mi">🛡️</span><span class="mt">Verwaltung</span><span class="ms">Admins, Karte, Konten</span></button>';
+  var h='<div class="panel" style="margin:12px 0"><b class="bpt">🛡️ Verwaltung</b><button type="button" class="linkb" data-a="admopen" data-v="" style="float:right">Zuklappen</button><p class="hint">Nur Administratoren sehen diesen Bereich.</p>';
   h+='<div class="fld"><span class="lbl">Administratoren</span>'+ppl.map(function(k){ return '<label class="cb" style="display:flex;gap:10px;align-items:center;margin:4px 0"><input type="checkbox" data-admset="'+k+'"'+(adm.indexOf(k)>-1?' checked':'')+' style="width:22px;height:22px"><span style="color:var(--p-'+k+');font-weight:700">'+esc(pname(k))+'</span></label>'; }).join('')
     +'<p class="hint">Administratoren ordnen die Google-Konten zu, bestimmen weitere Administratoren und schalten die Sichtbarkeit auf der Karte für alle ein und aus. Einer bleibt immer.</p></div>';
   h+='<div class="fld"><span class="lbl">📍 Auf der Karte sichtbar</span>'+ppl.map(function(k){ var r=locRow(k), on=!!(r&&r.on); return '<div class="tabrow" style="gap:8px"><span style="min-width:0;color:var(--p-'+k+');font-weight:700">'+esc(pname(k))+'</span><span style="flex:0 0 auto;color:var(--ink-2);font-size:13px">'+(on?(r.lat!==undefined&&r.ts?locAgo(r.ts):'an'):'aus')+(function(){ var d=(S.settingsRows||{})['dev_'+k]; if(!d) return ' · App?'; return d.bg==='ok'?' · Immer ✓':d.bg==='web'?' · nur Browser':' · Immer ✗'; })()+'</span><input type="checkbox" data-admvis="'+k+'"'+(on?' checked':'')+' aria-label="'+esc(pname(k))+' sichtbar"></div>'; }).join('')
@@ -2802,7 +2803,7 @@ document.addEventListener('click',function(e){ var t=e.target.closest('[data-a="
 document.addEventListener('change',function(e){ var el=e.target; if(!el||!el.dataset||!el.dataset.hr) return; e.stopImmediatePropagation(); var C=JSON.parse(JSON.stringify(hrCfg())), k=el.dataset.k, c=C[k]=C[k]||{pause:30};
   if(el.dataset.hr==='on') c.on=el.checked; else if(el.dataset.hr==='offcount') c.offcount=el.checked; else if(el.dataset.hr==='pause') c.pause=Math.max(0,Math.min(120,parseInt(el.value,10)||0)); else c.soll=String(el.value||'').slice(0,6);
   hrSave(C); renderSheet(); },true);
-var APPVER='25.11.2026 · 18:52';
+var APPVER='27.11.2026 · 17:23';
 // fb.js immer passend zur App-Version laden (sonst bleibt eine alte fb.js im Zwischenspeicher hängen)
 (function(){ try{ var s=document.createElement('script'); s.type='module'; s.src='fb.js?v='+encodeURIComponent(APPVER); document.head.appendChild(s); }catch(e){} })();
 
@@ -3519,6 +3520,7 @@ document.addEventListener('click',function(e){
     case 'meswitch': S.meSwitch=!!t.dataset.v; renderSheet(); break;
     case 'remopen': S.remOpen=!!t.dataset.v; renderSheet(); break;
     case 'alopen': S.alOpen=!!t.dataset.v; renderSheet(); break;
+    case 'admopen': S.admOpen=!!t.dataset.v; renderSheet(); break;
     case 'bgloc': try{ window.FPNative.askBgLoc(); }catch(e){} break;
     case 'setme':
       (function(){ var ma=myAcct(), nk=t.dataset.k; if(ma&&ma.k&&ma.k!==nk&&!isAdm()){ toast('Das ist fest mit deinem Google-Konto verbunden. Ändern kann es nur ein Administrator.'); return; } if(takenBy(nk)&&!isAdm()){ toast(pname(nk)+' ist schon mit einem anderen Google-Konto verbunden.'); return; }
@@ -3677,7 +3679,7 @@ document.addEventListener('change',function(e){
     S.settingsRows['loc_'+vk]=Object.assign({id:'loc_'+vk},vo); saveSettings('loc_'+vk,vo); setTimeout(function(){ var u=(pushRows().pushcfg||{}).worker; if(u&&vk!==S.me) try{ fetch(u,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({loc:vk})}).then(function(r){ return r.json(); }).then(function(j){
       if(j&&j.ok) toast(j.n?('📍 Handy von '+pname(vk)+' wurde benachrichtigt.'):('📍 '+pname(vk)+' hat kein Handy für Meldungen angemeldet. Das Teilen startet erst, wenn die App geöffnet wird.'));
       else toast('📍 Meldung an '+pname(vk)+' ging nicht raus ('+((j&&j.err)||'?')+').'); }).catch(function(){ toast('📍 Meldung an '+pname(vk)+' ging nicht raus (keine Verbindung zum Helfer).'); }); }catch(x){} },3000);
-    if(vk===S.me){ S.locPrev=von; locInit(); mapShareUI(); } toast(pname(vk)+(von?' ist jetzt auf der Karte sichtbar.':' ist jetzt unsichtbar.')); renderSheet(); return; }
+    if(vk===S.me){ S.locPrev=von; locInit(); mapShareUI(); } try{ mapFamUI(); }catch(x){} toast(pname(vk)+(von?' ist jetzt auf der Karte sichtbar.':' ist jetzt unsichtbar.')); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.rem&&S.me&&S.people[S.me]){ var rk=e.target.dataset.rem, rp=remPref(S.me); if(rk==='oth') rp.oth=!!e.target.checked; else rp[rk]=e.target.value; S.people[S.me].rem=remClean(rp); savePeople(); renderSheet(); return; }
   if(e.target&&e.target.dataset&&e.target.dataset.f2&&S.form){ S.form[e.target.dataset.f2]=!!e.target.checked; return; }
   if(e.target&&e.target.classList&&e.target.classList.contains('ntphoto')){ var pf=e.target.files&&e.target.files[0], pc=ctab(), pt=S.ntopic; e.target.value=''; if(!pf||!pc||!pt) return; ntFlush(); try{ if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); }catch(x){} S.ntBusy=true; renderCustom();
